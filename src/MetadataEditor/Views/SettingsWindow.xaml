@@ -232,6 +232,12 @@
                                             <TextBlock Text="Releases" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
+                                    <Button Style="{StaticResource ModernButton}" Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/KevinK56/MetadataEditor#readme" Margin="0,0,8,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="💖 " VerticalAlignment="Center"/>
+                                            <TextBlock Text="Support Development" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
                                     <Button Style="{StaticResource ModernButton}" Command="{Binding OpenUrlCommand}" CommandParameter="https://github.com/KevinK56/MetadataEditor/issues">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="🐛 " VerticalAlignment="Center"/>

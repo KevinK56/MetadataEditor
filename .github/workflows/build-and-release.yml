@@ -33,7 +33,7 @@ jobs:
       tag: ${{ steps.versioning.outputs.tag }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -67,9 +67,18 @@ jobs:
             exit 0
           }
 
-          $diffTarget = if ('${{ github.event_name }}' -eq 'pull_request') { 'origin/${{ github.base_ref }}' } else { 'HEAD~1' }
+          $beforeSha = '${{ github.event.before }}'
+          if ($beforeSha -and $beforeSha -notmatch '^0+$' -and (git cat-file -e $beforeSha 2>$null)) {
+            $diffTarget = $beforeSha
+          } elseif ('${{ github.event_name }}' -eq 'pull_request') {
+            $diffTarget = 'origin/${{ github.base_ref }}'
+          } else {
+            $diffTarget = 'HEAD~1'
+          }
+
+          Write-Host "Comparing changes against base commit: $diffTarget"
           $changedFiles = git diff --name-only $diffTarget HEAD
-          Write-Host "Changed files since $diffTarget:"
+          Write-Host "Changed file count: $($changedFiles.Count)"
           $changedFiles | ForEach-Object { Write-Host " - $_" }
 
           $codeChanges = $changedFiles | Where-Object {
@@ -96,10 +105,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -117,12 +126,12 @@ jobs:
       TAG: ${{ needs.detect-changes.outputs.tag }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 

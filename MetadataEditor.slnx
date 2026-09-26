@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MetadataEditor/MetadataEditor.csproj" />
+  </Folder>
+  <Folder Name="/src/tests/">
+    <Project Path="src/tests/MetadataEditor.Tests/MetadataEditor.Tests.csproj" />
+  </Folder>
+</Solution>

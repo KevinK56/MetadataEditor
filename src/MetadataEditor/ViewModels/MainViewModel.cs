@@ -1,0 +1,938 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Windows;
+using System.Windows.Input;
+using Microsoft.Win32;
+using MetadataEditor.Models;
+using MetadataEditor.Services;
+
+namespace MetadataEditor.ViewModels;
+
+public class MainViewModel : INotifyPropertyChanged
+{
+    private NfoMetadata _metadata = new();
+    private string _rawText = string.Empty;
+    private string? _currentFilePath;
+    private string _currentFileName = "Untitled.nfo";
+    private bool _isModified;
+    private string _statusMessage = "Ready";
+    private string _encodingName = "UTF-8";
+    private Encoding _currentEncoding = new UTF8Encoding(false);
+    private bool _hasBom;
+    private int _selectedTabIndex;
+    private string _searchText = string.Empty;
+    private string _selectedFilterType = "All";
+    private FileListItem? _selectedFileItem;
+    private string? _currentFolderPath;
+    private string? _artworkImagePath;
+    private bool _hasArtwork;
+
+    // Sub-item input buffers for quick adding
+    private string _newGenreText = string.Empty;
+    private string _newStudioText = string.Empty;
+    private string _newDirectorText = string.Empty;
+    private string _newWriterText = string.Empty;
+    private string _newCountryText = string.Empty;
+
+    public MainViewModel()
+    {
+        SupportedEncodings = new ObservableCollection<EncodingInfoItem>(FileEncodingDetector.GetSupportedEncodings());
+        FilterTypes = new ObservableCollection<string> { "All", "Movies", "TV Shows", "Episodes", "Music", "Plain Text" };
+
+        // Commands
+        OpenFileCommand = new RelayCommand(_ => ExecuteOpenFile());
+        OpenFolderCommand = new RelayCommand(_ => ExecuteOpenFolder());
+        SaveCommand = new RelayCommand(_ => ExecuteSave(), () => CanSave());
+        SaveAsCommand = new RelayCommand(_ => ExecuteSaveAs());
+        NewNfoCommand = new RelayCommand(p => ExecuteNewNfo(p as string));
+        ReloadCommand = new RelayCommand(_ => ExecuteReload(), () => !string.IsNullOrEmpty(CurrentFilePath));
+        FormatXmlCommand = new RelayCommand(_ => ExecuteFormatXml());
+        OpenInBrowserCommand = new RelayCommand(p => ExecuteOpenInBrowser(p as string));
+
+        // List item commands
+        AddGenreCommand = new RelayCommand(_ => ExecuteAddGenre());
+        RemoveGenreCommand = new RelayCommand(p => ExecuteRemoveGenre(p as string));
+        AddStudioCommand = new RelayCommand(_ => ExecuteAddStudio());
+        RemoveStudioCommand = new RelayCommand(p => ExecuteRemoveStudio(p as string));
+        AddDirectorCommand = new RelayCommand(_ => ExecuteAddDirector());
+        RemoveDirectorCommand = new RelayCommand(p => ExecuteRemoveDirector(p as string));
+        AddWriterCommand = new RelayCommand(_ => ExecuteAddWriter());
+        RemoveWriterCommand = new RelayCommand(p => ExecuteRemoveWriter(p as string));
+        AddCountryCommand = new RelayCommand(_ => ExecuteAddCountry());
+        RemoveCountryCommand = new RelayCommand(p => ExecuteRemoveCountry(p as string));
+
+        AddActorCommand = new RelayCommand(_ => ExecuteAddActor());
+        RemoveActorCommand = new RelayCommand(p => ExecuteRemoveActor(p as ActorItem));
+        MoveActorUpCommand = new RelayCommand(p => ExecuteMoveActor(p as ActorItem, -1));
+        MoveActorDownCommand = new RelayCommand(p => ExecuteMoveActor(p as ActorItem, 1));
+
+        AddTrackCommand = new RelayCommand(_ => ExecuteAddTrack());
+        RemoveTrackCommand = new RelayCommand(p => ExecuteRemoveTrack(p as TrackItem));
+
+        AddExtraNodeCommand = new RelayCommand(_ => ExecuteAddExtraNode());
+        RemoveExtraNodeCommand = new RelayCommand(p => ExecuteRemoveExtraNode(p as XmlExtraItem));
+
+        // Create default empty movie template
+        InitTemplate(NfoFileType.Movie);
+    }
+
+    public ObservableCollection<EncodingInfoItem> SupportedEncodings { get; }
+    public ObservableCollection<string> FilterTypes { get; }
+    public ObservableCollection<FileListItem> AllFiles { get; } = new();
+    public ObservableCollection<FileListItem> FilteredFiles { get; } = new();
+
+    public NfoMetadata Metadata
+    {
+        get => _metadata;
+        set
+        {
+            if (_metadata != null)
+            {
+                _metadata.DataModified -= OnMetadataModified;
+            }
+            var newMeta = value ?? new NfoMetadata();
+            if (!ReferenceEquals(_metadata, newMeta))
+            {
+                _metadata = newMeta;
+                _metadata.DataModified += OnMetadataModified;
+                OnPropertyChanged(nameof(Metadata));
+                OnPropertyChanged(nameof(SelectedFileType));
+                OnPropertyChanged(nameof(IsMovieType));
+                OnPropertyChanged(nameof(IsTvShowType));
+                OnPropertyChanged(nameof(IsEpisodeType));
+                OnPropertyChanged(nameof(IsMusicType));
+                OnPropertyChanged(nameof(IsGenericXmlType));
+                OnPropertyChanged(nameof(IsPlainTextType));
+            }
+        }
+    }
+
+    private void OnMetadataModified(object? sender, EventArgs e)
+    {
+        IsModified = true;
+    }
+
+    public string RawText
+    {
+        get => _rawText;
+        set
+        {
+            if (SetField(ref _rawText, value))
+            {
+                IsModified = true;
+            }
+        }
+    }
+
+    public string? CurrentFilePath
+    {
+        get => _currentFilePath;
+        set
+        {
+            if (SetField(ref _currentFilePath, value))
+            {
+                CurrentFileName = string.IsNullOrEmpty(value) ? "Untitled.nfo" : Path.GetFileName(value);
+                CheckArtwork();
+            }
+        }
+    }
+
+    public string CurrentFileName
+    {
+        get => _currentFileName;
+        set => SetField(ref _currentFileName, value);
+    }
+
+    public bool IsModified
+    {
+        get => _isModified;
+        set
+        {
+            if (SetField(ref _isModified, value))
+            {
+                if (SelectedFileItem != null && SelectedFileItem.FilePath == CurrentFilePath)
+                {
+                    SelectedFileItem.IsModified = value;
+                }
+            }
+        }
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set => SetField(ref _statusMessage, value);
+    }
+
+    public string EncodingName
+    {
+        get => _encodingName;
+        set => SetField(ref _encodingName, value);
+    }
+
+    public Encoding CurrentEncoding
+    {
+        get => _currentEncoding;
+        set => SetField(ref _currentEncoding, value);
+    }
+
+    public bool HasBom
+    {
+        get => _hasBom;
+        set => SetField(ref _hasBom, value);
+    }
+
+    private EncodingInfoItem? _selectedEncodingItem;
+    public EncodingInfoItem? SelectedEncodingItem
+    {
+        get => _selectedEncodingItem ?? SupportedEncodings.FirstOrDefault();
+        set
+        {
+            if (SetField(ref _selectedEncodingItem, value) && value != null)
+            {
+                CurrentEncoding = value.Encoding;
+                HasBom = value.HasBom;
+                EncodingName = value.DisplayName;
+                IsModified = true;
+            }
+        }
+    }
+
+    public int SelectedTabIndex
+    {
+        get => _selectedTabIndex;
+        set
+        {
+            int prev = _selectedTabIndex;
+            if (SetField(ref _selectedTabIndex, value))
+            {
+                OnTabChanged(prev, value);
+            }
+        }
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetField(ref _searchText, value))
+            {
+                ApplyFileFilters();
+            }
+        }
+    }
+
+    public string SelectedFilterType
+    {
+        get => _selectedFilterType;
+        set
+        {
+            if (SetField(ref _selectedFilterType, value))
+            {
+                ApplyFileFilters();
+            }
+        }
+    }
+
+    public FileListItem? SelectedFileItem
+    {
+        get => _selectedFileItem;
+        set
+        {
+            if (SetField(ref _selectedFileItem, value) && value != null)
+            {
+                if (!string.Equals(value.FilePath, CurrentFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    LoadFile(value.FilePath);
+                }
+            }
+        }
+    }
+
+    public string? CurrentFolderPath
+    {
+        get => _currentFolderPath;
+        set => SetField(ref _currentFolderPath, value);
+    }
+
+    public string? ArtworkImagePath
+    {
+        get => _artworkImagePath;
+        set => SetField(ref _artworkImagePath, value);
+    }
+
+    public bool HasArtwork
+    {
+        get => _hasArtwork;
+        set => SetField(ref _hasArtwork, value);
+    }
+
+    // Input buffers
+    public string NewGenreText
+    {
+        get => _newGenreText;
+        set => SetField(ref _newGenreText, value);
+    }
+
+    public string NewStudioText
+    {
+        get => _newStudioText;
+        set => SetField(ref _newStudioText, value);
+    }
+
+    public string NewDirectorText
+    {
+        get => _newDirectorText;
+        set => SetField(ref _newDirectorText, value);
+    }
+
+    public string NewWriterText
+    {
+        get => _newWriterText;
+        set => SetField(ref _newWriterText, value);
+    }
+
+    public string NewCountryText
+    {
+        get => _newCountryText;
+        set => SetField(ref _newCountryText, value);
+    }
+
+    // Type views
+    public NfoFileType SelectedFileType
+    {
+        get => Metadata.FileType;
+        set
+        {
+            if (Metadata.FileType != value)
+            {
+                Metadata.FileType = value;
+                OnPropertyChanged(nameof(SelectedFileType));
+                OnPropertyChanged(nameof(IsMovieType));
+                OnPropertyChanged(nameof(IsTvShowType));
+                OnPropertyChanged(nameof(IsEpisodeType));
+                OnPropertyChanged(nameof(IsMusicType));
+                OnPropertyChanged(nameof(IsGenericXmlType));
+                OnPropertyChanged(nameof(IsPlainTextType));
+                IsModified = true;
+
+                if (SelectedFileItem != null && SelectedFileItem.FilePath == CurrentFilePath)
+                {
+                    SelectedFileItem.FileType = value;
+                }
+            }
+        }
+    }
+
+    public bool IsMovieType => Metadata.FileType == NfoFileType.Movie;
+    public bool IsTvShowType => Metadata.FileType == NfoFileType.TvShow;
+    public bool IsEpisodeType => Metadata.FileType == NfoFileType.Episode;
+    public bool IsMusicType => Metadata.FileType == NfoFileType.MusicAlbum || Metadata.FileType == NfoFileType.MusicArtist || Metadata.FileType == NfoFileType.MusicVideo;
+    public bool IsGenericXmlType => Metadata.FileType == NfoFileType.GenericXml;
+    public bool IsPlainTextType => Metadata.FileType == NfoFileType.PlainText;
+
+    // Commands
+    public ICommand OpenFileCommand { get; }
+    public ICommand OpenFolderCommand { get; }
+    public ICommand SaveCommand { get; }
+    public ICommand SaveAsCommand { get; }
+    public ICommand NewNfoCommand { get; }
+    public ICommand ReloadCommand { get; }
+    public ICommand FormatXmlCommand { get; }
+    public ICommand OpenInBrowserCommand { get; }
+
+    public ICommand AddGenreCommand { get; }
+    public ICommand RemoveGenreCommand { get; }
+    public ICommand AddStudioCommand { get; }
+    public ICommand RemoveStudioCommand { get; }
+    public ICommand AddDirectorCommand { get; }
+    public ICommand RemoveDirectorCommand { get; }
+    public ICommand AddWriterCommand { get; }
+    public ICommand RemoveWriterCommand { get; }
+    public ICommand AddCountryCommand { get; }
+    public ICommand RemoveCountryCommand { get; }
+    public ICommand AddActorCommand { get; }
+    public ICommand RemoveActorCommand { get; }
+    public ICommand MoveActorUpCommand { get; }
+    public ICommand MoveActorDownCommand { get; }
+    public ICommand AddTrackCommand { get; }
+    public ICommand RemoveTrackCommand { get; }
+    public ICommand AddExtraNodeCommand { get; }
+    public ICommand RemoveExtraNodeCommand { get; }
+
+    private void OnTabChanged(int previousTab, int newTab)
+    {
+        // 0 = Visual Editor, 1 = Raw Text Editor, 2 = Artwork Preview
+        if (previousTab == 0 && newTab == 1)
+        {
+            // Sync from visual to raw text
+            if (Metadata.FileType != NfoFileType.PlainText)
+            {
+                RawText = NfoParserService.SerializeToXml(Metadata);
+            }
+        }
+        else if (previousTab == 1 && newTab == 0)
+        {
+            // Sync from raw text to visual
+            if (!string.IsNullOrWhiteSpace(RawText))
+            {
+                try
+                {
+                    var doc = System.Xml.Linq.XDocument.Parse(RawText);
+                    var newMeta = NfoParserService.ParseXmlToMetadata(doc, RawText);
+                    Metadata = newMeta;
+                    StatusMessage = "Visual editor updated from raw XML source.";
+                }
+                catch (Exception)
+                {
+                    StatusMessage = "Note: Raw text is not valid XML. Showing in plain text / current mode.";
+                }
+            }
+        }
+    }
+
+    public void LoadFile(string filePath)
+    {
+        if (IsModified && !PromptSaveBeforeAction())
+        {
+            return;
+        }
+
+        try
+        {
+            var result = NfoParserService.LoadFromFile(filePath);
+            Metadata = result.Metadata;
+            RawText = result.RawText;
+            CurrentFilePath = filePath;
+            CurrentEncoding = result.Encoding;
+            HasBom = result.HasBom;
+            EncodingName = result.EncodingName;
+            _selectedEncodingItem = SupportedEncodings.FirstOrDefault(x => x.DisplayName.StartsWith(result.EncodingName, StringComparison.OrdinalIgnoreCase)) ?? SupportedEncodings.FirstOrDefault();
+            OnPropertyChanged(nameof(SelectedEncodingItem));
+            IsModified = false;
+            StatusMessage = $"Loaded {Path.GetFileName(filePath)} ({result.EncodingName})";
+
+            // If it's plain text or ASCII art, switch to tab 1 (Raw Text / ASCII tab)
+            if (result.Metadata.FileType == NfoFileType.PlainText)
+            {
+                SelectedTabIndex = 1;
+            }
+            else
+            {
+                SelectedTabIndex = 0;
+            }
+
+            CheckArtwork();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to load file:\n{ex.Message}", "Error Loading NFO", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ExecuteOpenFile()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Open NFO or Metadata File",
+            Filter = "NFO Files (*.nfo)|*.nfo|XML Files (*.xml)|*.xml|Text Files (*.txt)|*.txt|All Files (*.*)|*.*",
+            Multiselect = false
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            LoadFile(dlg.FileName);
+        }
+    }
+
+    public void ExecuteOpenFolder(string? folder = null)
+    {
+        if (folder == null)
+        {
+            var dlg = new OpenFolderDialog
+            {
+                Title = "Select Folder Containing Media & NFO Files",
+                Multiselect = false
+            };
+
+            if (dlg.ShowDialog() != true)
+            {
+                return;
+            }
+            folder = dlg.FolderName;
+        }
+
+        if (!Directory.Exists(folder)) return;
+
+        CurrentFolderPath = folder;
+        AllFiles.Clear();
+
+        try
+        {
+            var files = Directory.GetFiles(folder, "*.nfo", SearchOption.AllDirectories);
+            foreach (var f in files)
+            {
+                var item = new FileListItem { FilePath = f };
+                // Quick inspect first 512 bytes to determine file type icon
+                try
+                {
+                    using var stream = File.OpenRead(f);
+                    using var reader = new StreamReader(stream, true);
+                    char[] buffer = new char[512];
+                    int read = reader.Read(buffer, 0, buffer.Length);
+                    string snippet = new string(buffer, 0, read).ToLowerInvariant();
+
+                    if (snippet.Contains("<movie")) item.FileType = NfoFileType.Movie;
+                    else if (snippet.Contains("<tvshow")) item.FileType = NfoFileType.TvShow;
+                    else if (snippet.Contains("<episodedetails") || snippet.Contains("<episode")) item.FileType = NfoFileType.Episode;
+                    else if (snippet.Contains("<album")) item.FileType = NfoFileType.MusicAlbum;
+                    else if (snippet.Contains("<artist")) item.FileType = NfoFileType.MusicArtist;
+                    else if (snippet.Contains("<?xml") || snippet.Contains("<")) item.FileType = NfoFileType.GenericXml;
+                    else item.FileType = NfoFileType.PlainText;
+                }
+                catch
+                {
+                    item.FileType = NfoFileType.PlainText;
+                }
+
+                AllFiles.Add(item);
+            }
+
+            ApplyFileFilters();
+            StatusMessage = $"Scanned {AllFiles.Count} NFO file(s) in {Path.GetFileName(folder)}";
+
+            if (AllFiles.Count > 0 && SelectedFileItem == null)
+            {
+                SelectedFileItem = AllFiles[0];
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error scanning folder:\n{ex.Message}", "Folder Scan Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ApplyFileFilters()
+    {
+        FilteredFiles.Clear();
+        string q = SearchText.Trim().ToLowerInvariant();
+
+        foreach (var file in AllFiles)
+        {
+            // Type filter
+            bool typeMatch = SelectedFilterType switch
+            {
+                "Movies" => file.FileType == NfoFileType.Movie,
+                "TV Shows" => file.FileType == NfoFileType.TvShow,
+                "Episodes" => file.FileType == NfoFileType.Episode,
+                "Music" => file.FileType == NfoFileType.MusicAlbum || file.FileType == NfoFileType.MusicArtist || file.FileType == NfoFileType.MusicVideo,
+                "Plain Text" => file.FileType == NfoFileType.PlainText,
+                _ => true
+            };
+
+            if (!typeMatch) continue;
+
+            // Search query filter
+            if (!string.IsNullOrEmpty(q))
+            {
+                if (!file.FileName.ToLowerInvariant().Contains(q) && !file.DirectoryName.ToLowerInvariant().Contains(q))
+                {
+                    continue;
+                }
+            }
+
+            FilteredFiles.Add(file);
+        }
+    }
+
+    private bool CanSave() => IsModified || !string.IsNullOrEmpty(CurrentFilePath);
+
+    public void ExecuteSave()
+    {
+        if (string.IsNullOrEmpty(CurrentFilePath))
+        {
+            ExecuteSaveAs();
+            return;
+        }
+
+        SaveToFile(CurrentFilePath);
+    }
+
+    public void ExecuteSaveAs()
+    {
+        var dlg = new SaveFileDialog
+        {
+            Title = "Save NFO File As",
+            Filter = "NFO File (*.nfo)|*.nfo|XML File (*.xml)|*.xml|All Files (*.*)|*.*",
+            FileName = CurrentFileName
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            SaveToFile(dlg.FileName);
+            CurrentFilePath = dlg.FileName;
+        }
+    }
+
+    private void SaveToFile(string targetPath)
+    {
+        try
+        {
+            // If saving in Visual Tab mode and it's XML, serialize visual model
+            string textToSave;
+            if (SelectedTabIndex == 0 && Metadata.FileType != NfoFileType.PlainText)
+            {
+                textToSave = NfoParserService.SerializeToXml(Metadata);
+                RawText = textToSave;
+            }
+            else
+            {
+                textToSave = RawText;
+            }
+
+            NfoParserService.SaveToFile(targetPath, textToSave, CurrentEncoding, HasBom);
+            IsModified = false;
+            StatusMessage = $"Saved successfully: {Path.GetFileName(targetPath)} at {DateTime.Now:HH:mm:ss}";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to save file:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public void ExecuteNewNfo(string? typeName = null)
+    {
+        if (IsModified && !PromptSaveBeforeAction())
+        {
+            return;
+        }
+
+        NfoFileType type = NfoFileType.Movie;
+        if (!string.IsNullOrEmpty(typeName))
+        {
+            if (Enum.TryParse(typeName, true, out NfoFileType parsed))
+            {
+                type = parsed;
+            }
+        }
+
+        InitTemplate(type);
+        CurrentFilePath = null;
+        CurrentFileName = $"New_{type}.nfo";
+        IsModified = true;
+        StatusMessage = $"Created new {type} NFO template";
+    }
+
+    private void InitTemplate(NfoFileType type)
+    {
+        Metadata = new NfoMetadata
+        {
+            FileType = type,
+            Title = "New Title",
+            Year = DateTime.Now.Year.ToString()
+        };
+
+        switch (type)
+        {
+            case NfoFileType.Movie:
+                Metadata.RootElementName = "movie";
+                Metadata.Genres.Add("Action");
+                Metadata.Genres.Add("Adventure");
+                Metadata.Plot = "Add movie plot summary here.";
+                break;
+            case NfoFileType.TvShow:
+                Metadata.RootElementName = "tvshow";
+                Metadata.Status = "Continuing";
+                Metadata.Plot = "Add TV show series overview here.";
+                break;
+            case NfoFileType.Episode:
+                Metadata.RootElementName = "episodedetails";
+                Metadata.Season = "1";
+                Metadata.Episode = "1";
+                Metadata.ShowTitle = "Series Name";
+                Metadata.Plot = "Add episode plot here.";
+                break;
+            case NfoFileType.MusicAlbum:
+                Metadata.RootElementName = "album";
+                Metadata.Artist = "Artist Name";
+                Metadata.Album = "Album Name";
+                Metadata.AlbumType = "Album";
+                Metadata.Tracks.Add(new TrackItem { Position = "1", Title = "Track 1", Duration = "3:30" });
+                break;
+            case NfoFileType.MusicArtist:
+                Metadata.RootElementName = "artist";
+                Metadata.Artist = "Artist Name";
+                Metadata.ArtistType = "Group";
+                Metadata.Biography = "Add artist biography here.";
+                break;
+            case NfoFileType.PlainText:
+                Metadata.RawText = "Artist / Title / Release Details\r\n\r\nRelease notes and tracklist...";
+                break;
+        }
+
+        RawText = type == NfoFileType.PlainText ? Metadata.RawText : NfoParserService.SerializeToXml(Metadata);
+        SelectedTabIndex = type == NfoFileType.PlainText ? 1 : 0;
+    }
+
+    private void ExecuteReload()
+    {
+        if (!string.IsNullOrEmpty(CurrentFilePath))
+        {
+            LoadFile(CurrentFilePath);
+        }
+    }
+
+    private void ExecuteFormatXml()
+    {
+        try
+        {
+            string source = SelectedTabIndex == 0 ? NfoParserService.SerializeToXml(Metadata) : RawText;
+            var doc = System.Xml.Linq.XDocument.Parse(source);
+            var sb = new StringBuilder();
+            var settings = new System.Xml.XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "  ",
+                NewLineChars = "\r\n",
+                OmitXmlDeclaration = false,
+                Encoding = Encoding.UTF8
+            };
+            using (var writer = System.Xml.XmlWriter.Create(sb, settings))
+            {
+                doc.Save(writer);
+            }
+            RawText = sb.ToString();
+            StatusMessage = "XML Formatted and formatted cleanly.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to format XML:\n{ex.Message}", "XML Format Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ExecuteOpenInBrowser(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+        try
+        {
+            if (url.StartsWith("tt") && url.Length >= 7) // IMDb ID
+            {
+                url = $"https://www.imdb.com/title/{url}/";
+            }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open link:\n{ex.Message}", "Link Error", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    // List item helpers
+    private void ExecuteAddGenre()
+    {
+        if (!string.IsNullOrWhiteSpace(NewGenreText) && !Metadata.Genres.Contains(NewGenreText.Trim()))
+        {
+            Metadata.Genres.Add(NewGenreText.Trim());
+            NewGenreText = string.Empty;
+        }
+    }
+
+    private void ExecuteRemoveGenre(string? g)
+    {
+        if (g != null) Metadata.Genres.Remove(g);
+    }
+
+    private void ExecuteAddStudio()
+    {
+        if (!string.IsNullOrWhiteSpace(NewStudioText) && !Metadata.Studios.Contains(NewStudioText.Trim()))
+        {
+            Metadata.Studios.Add(NewStudioText.Trim());
+            NewStudioText = string.Empty;
+        }
+    }
+
+    private void ExecuteRemoveStudio(string? s)
+    {
+        if (s != null) Metadata.Studios.Remove(s);
+    }
+
+    private void ExecuteAddDirector()
+    {
+        if (!string.IsNullOrWhiteSpace(NewDirectorText) && !Metadata.Directors.Contains(NewDirectorText.Trim()))
+        {
+            Metadata.Directors.Add(NewDirectorText.Trim());
+            NewDirectorText = string.Empty;
+        }
+    }
+
+    private void ExecuteRemoveDirector(string? d)
+    {
+        if (d != null) Metadata.Directors.Remove(d);
+    }
+
+    private void ExecuteAddWriter()
+    {
+        if (!string.IsNullOrWhiteSpace(NewWriterText) && !Metadata.Writers.Contains(NewWriterText.Trim()))
+        {
+            Metadata.Writers.Add(NewWriterText.Trim());
+            NewWriterText = string.Empty;
+        }
+    }
+
+    private void ExecuteRemoveWriter(string? w)
+    {
+        if (w != null) Metadata.Writers.Remove(w);
+    }
+
+    private void ExecuteAddCountry()
+    {
+        if (!string.IsNullOrWhiteSpace(NewCountryText) && !Metadata.Countries.Contains(NewCountryText.Trim()))
+        {
+            Metadata.Countries.Add(NewCountryText.Trim());
+            NewCountryText = string.Empty;
+        }
+    }
+
+    private void ExecuteRemoveCountry(string? c)
+    {
+        if (c != null) Metadata.Countries.Remove(c);
+    }
+
+    private void ExecuteAddActor()
+    {
+        Metadata.Actors.Add(new ActorItem
+        {
+            Name = "New Actor",
+            Role = "Character Name",
+            Order = Metadata.Actors.Count
+        });
+    }
+
+    private void ExecuteRemoveActor(ActorItem? actor)
+    {
+        if (actor != null) Metadata.Actors.Remove(actor);
+    }
+
+    private void ExecuteMoveActor(ActorItem? actor, int direction)
+    {
+        if (actor == null) return;
+        int idx = Metadata.Actors.IndexOf(actor);
+        int newIdx = idx + direction;
+        if (newIdx >= 0 && newIdx < Metadata.Actors.Count)
+        {
+            Metadata.Actors.Move(idx, newIdx);
+            for (int i = 0; i < Metadata.Actors.Count; i++)
+            {
+                Metadata.Actors[i].Order = i;
+            }
+        }
+    }
+
+    private void ExecuteAddTrack()
+    {
+        Metadata.Tracks.Add(new TrackItem
+        {
+            Position = (Metadata.Tracks.Count + 1).ToString(),
+            Title = "New Track",
+            Duration = "3:00"
+        });
+    }
+
+    private void ExecuteRemoveTrack(TrackItem? track)
+    {
+        if (track != null) Metadata.Tracks.Remove(track);
+    }
+
+    private void ExecuteAddExtraNode()
+    {
+        Metadata.ExtraNodes.Add(new XmlExtraItem
+        {
+            TagName = "customtag",
+            TagValue = "value"
+        });
+    }
+
+    private void ExecuteRemoveExtraNode(XmlExtraItem? extra)
+    {
+        if (extra != null) Metadata.ExtraNodes.Remove(extra);
+    }
+
+    private void CheckArtwork()
+    {
+        ArtworkImagePath = null;
+        HasArtwork = false;
+
+        if (string.IsNullOrEmpty(CurrentFilePath)) return;
+
+        string dir = Path.GetDirectoryName(CurrentFilePath) ?? string.Empty;
+        if (!Directory.Exists(dir)) return;
+
+        string baseName = Path.GetFileNameWithoutExtension(CurrentFilePath);
+        string[] candidates =
+        {
+            Path.Combine(dir, $"{baseName}-poster.jpg"),
+            Path.Combine(dir, $"{baseName}-poster.png"),
+            Path.Combine(dir, $"{baseName}.jpg"),
+            Path.Combine(dir, $"{baseName}.png"),
+            Path.Combine(dir, "poster.jpg"),
+            Path.Combine(dir, "poster.png"),
+            Path.Combine(dir, "folder.jpg"),
+            Path.Combine(dir, "folder.png"),
+            Path.Combine(dir, "cover.jpg"),
+            Path.Combine(dir, "cover.png")
+        };
+
+        foreach (var c in candidates)
+        {
+            if (File.Exists(c))
+            {
+                ArtworkImagePath = c;
+                HasArtwork = true;
+                return;
+            }
+        }
+    }
+
+    private bool PromptSaveBeforeAction()
+    {
+        var result = MessageBox.Show(
+            $"You have unsaved changes in '{CurrentFileName}'.\nDo you want to save before continuing?",
+            "Unsaved Changes",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            ExecuteSave();
+            return true;
+        }
+        if (result == MessageBoxResult.No)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+}

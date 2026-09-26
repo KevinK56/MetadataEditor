@@ -1,0 +1,875 @@
+<Window x:Class="MetadataEditor.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        xmlns:local="clr-namespace:MetadataEditor"
+        xmlns:vm="clr-namespace:MetadataEditor.ViewModels"
+        xmlns:views="clr-namespace:MetadataEditor.Views"
+        xmlns:models="clr-namespace:MetadataEditor.Models"
+        mc:Ignorable="d"
+        ui:ThemeManager.RequestedTheme="Dark"
+        Title="Metadata Editor - Universal NFO Editor"
+        Icon="/MetadataEditor;component/Resources/app.ico"
+        Width="1260" Height="780" MinWidth="960" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver">
+
+    <Window.DataContext>
+        <vm:MainViewModel x:Name="ViewModel"/>
+    </Window.DataContext>
+
+    <Window.Resources>
+        <views:BoolToVisConverter x:Key="BoolToVis"/>
+        <views:BoolToVisConverter x:Key="InverseBoolToVis" Invert="True"/>
+        <views:StringNullOrEmptyToVisConverter x:Key="StringNullOrEmptyToVis"/>
+    </Window.Resources>
+
+    <Window.InputBindings>
+        <KeyBinding Modifiers="Ctrl" Key="O" Command="{Binding OpenFileCommand}"/>
+        <KeyBinding Modifiers="Ctrl" Key="S" Command="{Binding SaveCommand}"/>
+        <KeyBinding Modifiers="Ctrl+Shift" Key="S" Command="{Binding SaveAsCommand}"/>
+        <KeyBinding Modifiers="Ctrl" Key="N" Command="{Binding NewNfoCommand}"/>
+        <KeyBinding Key="F5" Command="{Binding ReloadCommand}"/>
+    </Window.InputBindings>
+
+    <Grid Background="{StaticResource BgDarkBrush}">
+        <Grid.RowDefinitions>
+            <!-- Top App / Action Bar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Main Content Area -->
+            <RowDefinition Height="*"/>
+            <!-- Bottom Status Bar -->
+            <RowDefinition Height="28"/>
+        </Grid.RowDefinitions>
+
+        <!-- TOP APPLICATION HEADER & TOOLBAR -->
+        <Border Grid.Row="0" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="0,0,0,1" Padding="14,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <!-- App Logo & Title -->
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- File Info & Mode Selectors -->
+                    <ColumnDefinition Width="*"/>
+                    <!-- Action Buttons -->
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Branding -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <Border Width="42" Height="42" CornerRadius="10" BorderBrush="#60A5FA" BorderThickness="1.5" Margin="0,0,10,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#0284C7" Offset="0.0"/>
+                                <GradientStop Color="#1D4ED8" Offset="1.0"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="NFO" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" LineHeight="12" LineStackingStrategy="BlockLineHeight"/>
+                            <TextBlock Text="Edit" Foreground="#FFFFFF" FontWeight="SemiBold" FontSize="8.5" HorizontalAlignment="Center" LineHeight="9" LineStackingStrategy="BlockLineHeight"/>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Metadata Editor" FontWeight="Bold" FontSize="15" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Universal Movies, TV &amp; Music Editor" FontSize="10" Foreground="{StaticResource TextMutedBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Center: Active File Info & Type Selector -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                    <!-- File Name & Modified Indicator -->
+                    <Border Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="6" Padding="10,5" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding CurrentFileName}" FontWeight="SemiBold" FontSize="12.5" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text=" ●" Foreground="{StaticResource AccentOrangeBrush}" FontWeight="Bold" FontSize="13" VerticalAlignment="Center"
+                                       Visibility="{Binding IsModified, Converter={StaticResource BoolToVis}}" ToolTip="Unsaved changes"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Type Selector Dropdown -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
+                        <TextBlock Text="Format:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox SelectedValue="{Binding SelectedFileType}" Width="150" Height="32" VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="Medium" FontSize="12.5"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                            <models:NfoFileType>Movie</models:NfoFileType>
+                            <models:NfoFileType>TvShow</models:NfoFileType>
+                            <models:NfoFileType>Episode</models:NfoFileType>
+                            <models:NfoFileType>MusicAlbum</models:NfoFileType>
+                            <models:NfoFileType>MusicArtist</models:NfoFileType>
+                            <models:NfoFileType>GenericXml</models:NfoFileType>
+                            <models:NfoFileType>PlainText</models:NfoFileType>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Encoding Dropdown -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Encoding:" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox ItemsSource="{Binding SupportedEncodings}" SelectedItem="{Binding SelectedEncodingItem}" Width="195" Height="32" VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Right: Action Buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Open Folder Button -->
+                    <Button Style="{StaticResource ModernButton}" Command="{Binding OpenFolderCommand}" Margin="0,0,6,0" ToolTip="Open folder of media and scan for NFO files">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📁" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Folder..." VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Open File Button -->
+                    <Button Style="{StaticResource ModernButton}" Command="{Binding OpenFileCommand}" Margin="0,0,6,0" ToolTip="Open single NFO or XML file (Ctrl+O)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📂" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Open..." VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- New NFO Dropdown / Menu -->
+                    <Menu Background="Transparent" VerticalAlignment="Center" Margin="0,0,6,0">
+                        <MenuItem Header="➕ New..." Style="{x:Null}" Padding="10,6" Background="{StaticResource BgCardBrush}" Foreground="{StaticResource TextPrimaryBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1">
+                            <MenuItem Header="🎬 New Movie NFO" Command="{Binding NewNfoCommand}" CommandParameter="Movie"/>
+                            <MenuItem Header="📺 New TV Show NFO" Command="{Binding NewNfoCommand}" CommandParameter="TvShow"/>
+                            <MenuItem Header="🎞️ New TV Episode NFO" Command="{Binding NewNfoCommand}" CommandParameter="Episode"/>
+                            <MenuItem Header="💿 New Music Album NFO" Command="{Binding NewNfoCommand}" CommandParameter="MusicAlbum"/>
+                            <MenuItem Header="👤 New Music Artist NFO" Command="{Binding NewNfoCommand}" CommandParameter="MusicArtist"/>
+                            <Separator/>
+                            <MenuItem Header="📄 New Plain Text / Scene NFO" Command="{Binding NewNfoCommand}" CommandParameter="PlainText"/>
+                        </MenuItem>
+                    </Menu>
+
+                    <!-- Save Button -->
+                    <Button Style="{StaticResource PrimaryButton}" Command="{Binding SaveCommand}" Margin="0,0,6,0" ToolTip="Save changes (Ctrl+S)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💾" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Save" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Save As Button -->
+                    <Button Style="{StaticResource ModernButton}" Command="{Binding SaveAsCommand}" ToolTip="Save as new file (Ctrl+Shift+S)">
+                        <TextBlock Text="Save As..." VerticalAlignment="Center"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- MAIN WORKSPACE SPLIT (Left Sidebar + Center Editor) -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- Left Sidebar: Folder Files Browser -->
+                <ColumnDefinition Width="280" MinWidth="200" MaxWidth="450"/>
+                <!-- Splitter -->
+                <ColumnDefinition Width="4"/>
+                <!-- Center: Tabs and Editor -->
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- SIDEBAR: BROWSER -->
+            <Border Grid.Column="0" Background="#111827" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="0,0,1,0">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <!-- Sidebar Header -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Search Box -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Filter Chips -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- File List -->
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                        <TextBlock Text="Files in Folder" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Text="{Binding FilteredFiles.Count, StringFormat='({0})'}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="6,0,0,0"/>
+                    </DockPanel>
+
+                    <!-- Search Input -->
+                    <TextBox Grid.Row="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" Height="32"/>
+
+                    <!-- Category Filter Dropdown -->
+                    <ComboBox Grid.Row="2" ItemsSource="{Binding FilterTypes}" SelectedItem="{Binding SelectedFilterType}" Margin="0,0,0,8" Height="32">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12.5"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- File List -->
+                    <ListBox Grid.Row="3" ItemsSource="{Binding FilteredFiles}" SelectedItem="{Binding SelectedFileItem}"
+                             Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type models:FileListItem}">
+                                <Border Padding="6,5" CornerRadius="4" Margin="0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="26"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding IconText}" FontSize="14" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding DirectoryName}" Foreground="{StaticResource TextMutedBrush}" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="●" Foreground="{StaticResource AccentOrangeBrush}" FontSize="12"
+                                                   Visibility="{Binding IsModified, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- SPLITTER -->
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="#1E293B"/>
+
+            <!-- CENTER WORK AREA -->
+            <Grid Grid.Column="2" Margin="14,10,14,10">
+                <Grid.RowDefinitions>
+                    <!-- Tab Header Bar -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- Tab Content -->
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TabControl Grid.Row="0" Grid.RowSpan="2" SelectedIndex="{Binding SelectedTabIndex}">
+                    <!-- TAB 1: VISUAL METADATA EDITOR -->
+                    <TabItem Header="📋 Metadata Form">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,10,10,10">
+                            <StackPanel Margin="0,0,16,0" HorizontalAlignment="Stretch">
+
+                                <!-- CARD 1: PRIMARY INFORMATION -->
+                                <Border Style="{StaticResource CardPanel}">
+                                    <StackPanel>
+                                        <TextBlock Text="Primary Information" Style="{StaticResource SectionHeader}"/>
+
+                                        <!-- Title, Original Title & Sort Title (Equal 3-Way Split) -->
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Main Title -->
+                                            <StackPanel Grid.Column="0" Grid.ColumnSpan="3">
+                                                <TextBlock Text="Title / Media Name *" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Title, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold"/>
+                                            </StackPanel>
+
+                                            <!-- Original Title -->
+                                            <StackPanel Grid.Column="4" Grid.ColumnSpan="3">
+                                                <TextBlock Text="Original Title" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.OriginalTitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Sort Title -->
+                                            <StackPanel Grid.Column="8" Grid.ColumnSpan="3">
+                                                <TextBlock Text="Sort Title" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.SortTitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- TV / Episode Specific Row (Visible for TV/Episode) -->
+                                        <Grid Margin="0,0,0,12" Visibility="{Binding IsEpisodeType, Converter={StaticResource BoolToVis}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Grid.ColumnSpan="5">
+                                                <TextBlock Text="TV Series / Show Title" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.ShowTitle, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="6">
+                                                <TextBlock Text="Season #" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Season, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="8">
+                                                <TextBlock Text="Episode #" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Episode, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="10">
+                                                <TextBlock Text="Aired Date (YYYY-MM-DD)" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Aired, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Music Specific Row (Visible for Music) -->
+                                        <Grid Margin="0,0,0,12" Visibility="{Binding IsMusicType, Converter={StaticResource BoolToVis}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Grid.ColumnSpan="3">
+                                                <TextBlock Text="Artist / Performer Name" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Artist, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="4" Grid.ColumnSpan="3">
+                                                <TextBlock Text="Album Name" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Album, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="8" Grid.ColumnSpan="3">
+                                                <TextBlock Text="Record Label" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Label, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Dates, Runtime, Ratings Row (6 Equal Symmetrical Columns) -->
+                                        <Grid Margin="0,0,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Year -->
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Year" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Year, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Premiered / Release Date -->
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Premiered Date" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Premiered, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Runtime -->
+                                            <StackPanel Grid.Column="4">
+                                                <TextBlock Text="Runtime (mins)" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Runtime, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Rating (0-10) -->
+                                            <StackPanel Grid.Column="6">
+                                                <TextBlock Text="Rating (0-10)" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Rating, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Votes -->
+                                            <StackPanel Grid.Column="8">
+                                                <TextBlock Text="Votes" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Votes, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Content Rating / MPAA -->
+                                            <StackPanel Grid.Column="10">
+                                                <TextBlock Text="Certification / MPAA" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.Mpaa, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- CARD 2: STORY, PLOT & OVERVIEW -->
+                                <Border Style="{StaticResource CardPanel}">
+                                    <StackPanel>
+                                        <TextBlock Text="Story, Plot &amp; Overview" Style="{StaticResource SectionHeader}"/>
+
+                                        <!-- Tagline -->
+                                        <TextBlock Text="Tagline" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Text="{Binding Metadata.Tagline, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10"/>
+
+                                        <!-- Overview / Plot -->
+                                        <TextBlock Text="Plot / Overview" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Text="{Binding Metadata.Plot, UpdateSourceTrigger=PropertyChanged}"
+                                                 TextWrapping="Wrap" AcceptsReturn="True" Height="100" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10"/>
+
+                                        <!-- Outline -->
+                                        <TextBlock Text="Short Outline" Style="{StaticResource FieldLabel}"/>
+                                        <TextBox Text="{Binding Metadata.Outline, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- CARD 3: GENRES, STUDIOS & COUNTRIES -->
+                                <Border Style="{StaticResource CardPanel}">
+                                    <StackPanel>
+                                        <TextBlock Text="Genres &amp; Production Details" Style="{StaticResource SectionHeader}"/>
+
+                                        <Grid Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- GENRES -->
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Genres" Style="{StaticResource FieldLabel}"/>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Text="{Binding NewGenreText, UpdateSourceTrigger=PropertyChanged}"/>
+                                                    <Button Grid.Column="1" Content="+ Add" Style="{StaticResource ModernButton}" Command="{Binding AddGenreCommand}" Margin="6,0,0,0"/>
+                                                </Grid>
+                                                <Border MinHeight="44" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="6" Padding="6,6,0,0">
+                                                    <ItemsControl ItemsSource="{Binding Metadata.Genres}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Background="#1E3A8A" CornerRadius="12" Padding="8,3" Margin="0,0,6,6">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding}" Foreground="#93C5FD" FontSize="11.5" VerticalAlignment="Center"/>
+                                                                        <Button Content="✕" Margin="6,0,0,0" Padding="2,0" Background="Transparent" Foreground="#60A5FA" BorderThickness="0"
+                                                                                Command="{Binding DataContext.RemoveGenreCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- STUDIOS -->
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Studios / Networks" Style="{StaticResource FieldLabel}"/>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Text="{Binding NewStudioText, UpdateSourceTrigger=PropertyChanged}"/>
+                                                    <Button Grid.Column="1" Content="+ Add" Style="{StaticResource ModernButton}" Command="{Binding AddStudioCommand}" Margin="6,0,0,0"/>
+                                                </Grid>
+                                                <Border MinHeight="44" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="6" Padding="6,6,0,0">
+                                                    <ItemsControl ItemsSource="{Binding Metadata.Studios}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Background="#3B2E58" CornerRadius="12" Padding="8,3" Margin="0,0,6,6">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding}" Foreground="#D8B4FE" FontSize="11.5" VerticalAlignment="Center"/>
+                                                                        <Button Content="✕" Margin="6,0,0,0" Padding="2,0" Background="Transparent" Foreground="#C084FC" BorderThickness="0"
+                                                                                Command="{Binding DataContext.RemoveStudioCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- DIRECTORS -->
+                                            <StackPanel Grid.Column="4">
+                                                <TextBlock Text="Directors" Style="{StaticResource FieldLabel}"/>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Text="{Binding NewDirectorText, UpdateSourceTrigger=PropertyChanged}"/>
+                                                    <Button Grid.Column="1" Content="+ Add" Style="{StaticResource ModernButton}" Command="{Binding AddDirectorCommand}" Margin="6,0,0,0"/>
+                                                </Grid>
+                                                <Border MinHeight="44" Background="{StaticResource BgInputBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="6" Padding="6,6,0,0">
+                                                    <ItemsControl ItemsSource="{Binding Metadata.Directors}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Border Background="#1C3D3D" CornerRadius="12" Padding="8,3" Margin="0,0,6,6">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding}" Foreground="#5EEAD4" FontSize="11.5" VerticalAlignment="Center"/>
+                                                                        <Button Content="✕" Margin="6,0,0,0" Padding="2,0" Background="Transparent" Foreground="#2DD4BF" BorderThickness="0"
+                                                                                Command="{Binding DataContext.RemoveDirectorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                CommandParameter="{Binding}"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- CARD 4: CAST & CHARACTERS (Visible for Movies & TV) -->
+                                <Border Style="{StaticResource CardPanel}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <TextBlock Text="Cast &amp; Characters" Style="{StaticResource SectionHeader}"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button Content="➕ Add Actor" Style="{StaticResource ModernButton}" Command="{Binding AddActorCommand}" Margin="0,0,6,0"/>
+                                            </StackPanel>
+                                        </DockPanel>
+
+                                        <DataGrid ItemsSource="{Binding Metadata.Actors}" AutoGenerateColumns="False" CanUserAddRows="False"
+                                                  MaxHeight="260" Background="{StaticResource BgInputBrush}" RowBackground="{StaticResource BgInputBrush}"
+                                                  BorderBrush="{StaticResource BorderDarkBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderDarkBrush}">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Order" Binding="{Binding Order}" Width="80"/>
+                                                <DataGridTextColumn Header="Actor Name" Binding="{Binding Name}" Width="1.5*"/>
+                                                <DataGridTextColumn Header="Character / Role" Binding="{Binding Role}" Width="1.5*"/>
+                                                <DataGridTextColumn Header="Photo URL" Binding="{Binding Thumb}" Width="2*"/>
+                                                <DataGridTemplateColumn Header="Actions" Width="130">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                <Button Content="▲" Padding="4,2" Margin="0,0,4,0" Style="{StaticResource ModernButton}"
+                                                                        Command="{Binding DataContext.MoveActorUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"/>
+                                                                <Button Content="▼" Padding="4,2" Margin="0,0,4,0" Style="{StaticResource ModernButton}"
+                                                                        Command="{Binding DataContext.MoveActorDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"/>
+                                                                <Button Content="✕" Padding="5,2" Style="{StaticResource ModernButton}" Foreground="{StaticResource AccentRedBrush}"
+                                                                        Command="{Binding DataContext.RemoveActorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"/>
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- CARD 5: MUSIC TRACKS (Visible for Music Albums) -->
+                                <Border Style="{StaticResource CardPanel}" Visibility="{Binding IsMusicType, Converter={StaticResource BoolToVis}}">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <TextBlock Text="Album Tracklist" Style="{StaticResource SectionHeader}"/>
+                                            <Button Content="➕ Add Track" Style="{StaticResource ModernButton}" Command="{Binding AddTrackCommand}" HorizontalAlignment="Right"/>
+                                        </DockPanel>
+
+                                        <DataGrid ItemsSource="{Binding Metadata.Tracks}" AutoGenerateColumns="False" CanUserAddRows="False"
+                                                  MaxHeight="200" Background="{StaticResource BgInputBrush}" RowBackground="{StaticResource BgInputBrush}"
+                                                  BorderBrush="{StaticResource BorderDarkBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderDarkBrush}">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="#" Binding="{Binding Position}" Width="50"/>
+                                                <DataGridTextColumn Header="Track Title" Binding="{Binding Title}" Width="*"/>
+                                                <DataGridTextColumn Header="Duration" Binding="{Binding Duration}" Width="100"/>
+                                                <DataGridTemplateColumn Header="Action" Width="60">
+                                                    <DataGridTemplateColumn.CellTemplate>
+                                                        <DataTemplate>
+                                                            <Button Content="✕" Padding="6,2" Style="{StaticResource ModernButton}" Foreground="{StaticResource AccentRedBrush}"
+                                                                    Command="{Binding DataContext.RemoveTrackCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                    CommandParameter="{Binding}"/>
+                                                        </DataTemplate>
+                                                    </DataGridTemplateColumn.CellTemplate>
+                                                </DataGridTemplateColumn>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- CARD 6: ONLINE IDENTIFIERS & WEB LINKS -->
+                                <Border Style="{StaticResource CardPanel}">
+                                    <StackPanel>
+                                        <TextBlock Text="Online IDs &amp; Web Links" Style="{StaticResource SectionHeader}"/>
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- IMDb ID -->
+                                            <StackPanel Grid.Column="0">
+                                                <DockPanel>
+                                                    <TextBlock Text="IMDb ID (tt...)" Style="{StaticResource FieldLabel}"/>
+                                                    <Button Content="🔗" ToolTip="Open on IMDb" Background="Transparent" BorderThickness="0" Margin="4,0,0,0"
+                                                            Command="{Binding OpenInBrowserCommand}" CommandParameter="{Binding Metadata.ImdbId}"/>
+                                                </DockPanel>
+                                                <TextBox Text="{Binding Metadata.ImdbId, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- TMDb ID -->
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="TMDb ID" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.TmdbId, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- TVDb ID -->
+                                            <StackPanel Grid.Column="4">
+                                                <TextBlock Text="TVDb ID" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.TvdbId, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+
+                                            <!-- Trailer URL -->
+                                            <StackPanel Grid.Column="6" Grid.ColumnSpan="5">
+                                                <DockPanel>
+                                                    <TextBlock Text="Trailer URL" Style="{StaticResource FieldLabel}"/>
+                                                    <Button Content="🔗 Open" ToolTip="Test Trailer Link" Background="Transparent" BorderThickness="0" Margin="4,0,0,0"
+                                                            Command="{Binding OpenInBrowserCommand}" CommandParameter="{Binding Metadata.Trailer}"/>
+                                                </DockPanel>
+                                                <TextBox Text="{Binding Metadata.Trailer, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Movie Set / Collection -->
+                                        <Grid Margin="0,0,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                                <ColumnDefinition Width="12"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Grid.ColumnSpan="5">
+                                                <TextBlock Text="Movie Set / Franchise Name" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.SetName, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="6" Grid.ColumnSpan="5">
+                                                <TextBlock Text="Movie Set Overview" Style="{StaticResource FieldLabel}"/>
+                                                <TextBox Text="{Binding Metadata.SetOverview, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- CARD 7: EXTRA / CUSTOM XML TAGS (GUARANTEES NO TAG IS EVER LOST) -->
+                                <Border Style="{StaticResource CardPanel}">
+                                    <Expander Header="Custom &amp; Extra XML Tags (Preserves Any Additional Fields)" IsExpanded="False" Foreground="{StaticResource TextSecondaryBrush}">
+                                        <StackPanel Margin="0,10,0,0">
+                                            <DockPanel Margin="0,0,0,8">
+                                                <TextBlock Text="Any additional or specialized XML tags found in the NFO file:" Foreground="{StaticResource TextMutedBrush}" FontSize="11.5" VerticalAlignment="Center"/>
+                                                <Button Content="➕ Add Custom Tag" Style="{StaticResource ModernButton}" Command="{Binding AddExtraNodeCommand}" HorizontalAlignment="Right"/>
+                                            </DockPanel>
+                                            <DataGrid ItemsSource="{Binding Metadata.ExtraNodes}" AutoGenerateColumns="False" CanUserAddRows="False"
+                                                      MaxHeight="200" Background="{StaticResource BgInputBrush}" RowBackground="{StaticResource BgInputBrush}"
+                                                      BorderBrush="{StaticResource BorderDarkBrush}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                      HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource BorderDarkBrush}">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="Tag Name" Binding="{Binding TagName}" Width="180"/>
+                                                    <DataGridTextColumn Header="Tag Value or XML Content" Binding="{Binding TagValue}" Width="*"/>
+                                                    <DataGridTemplateColumn Header="Action" Width="60">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="✕" Padding="6,2" Style="{StaticResource ModernButton}" Foreground="{StaticResource AccentRedBrush}"
+                                                                        Command="{Binding DataContext.RemoveExtraNodeCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"/>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </StackPanel>
+                                    </Expander>
+                                </Border>
+
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- TAB 2: RAW TEXT / XML SOURCE EDITOR -->
+                    <TabItem Header="📝 Raw Text / XML Editor">
+                        <Grid Margin="0,10,0,0">
+                            <Grid.RowDefinitions>
+                                <!-- Editor Toolbar -->
+                                <RowDefinition Height="Auto"/>
+                                <!-- Text Editor Area -->
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Raw Editor Toolbar -->
+                            <Border Grid.Row="0" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,0,10">
+                                <DockPanel>
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                        <Button Content="🔄 Format / Indent XML" Style="{StaticResource ModernButton}" Command="{Binding FormatXmlCommand}" Margin="0,0,8,0"/>
+                                        <CheckBox x:Name="WordWrapCheck" Content="Word Wrap" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    </StackPanel>
+
+                                    <!-- Quick Find in Text -->
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Text="Find:" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBox x:Name="FindTextBox" Width="180" Height="26" Margin="0,0,6,0" KeyDown="FindTextBox_KeyDown"/>
+                                        <Button Content="Find Next" Style="{StaticResource ModernButton}" Click="FindNext_Click" Margin="0,0,6,0"/>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Raw Editor TextBox -->
+                            <TextBox Grid.Row="1" x:Name="RawEditorTextBox"
+                                     Text="{Binding RawText, UpdateSourceTrigger=PropertyChanged}"
+                                     FontFamily="Consolas, Cascadia Mono, Courier New, monospace"
+                                     FontSize="13"
+                                     Background="{StaticResource BgInputBrush}"
+                                     Foreground="#E2E8F0"
+                                     BorderBrush="{StaticResource BorderDarkBrush}"
+                                     BorderThickness="1"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="True"
+                                     TextWrapping="{Binding IsChecked, ElementName=WordWrapCheck, Converter={x:Static views:WrapConverter.Instance}}"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"/>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- TAB 3: ARTWORK & DETAILS PREVIEW -->
+                    <TabItem Header="🖼️ Artwork &amp; Details">
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <!-- Left: Artwork Poster Image -->
+                                <ColumnDefinition Width="380"/>
+                                <!-- Right: File metadata tech specs -->
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Poster / Artwork Image -->
+                            <Border Grid.Column="0" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,14,0">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Image Source="{Binding ArtworkImagePath}" MaxHeight="480" MaxWidth="340" Stretch="Uniform"
+                                           Visibility="{Binding HasArtwork, Converter={StaticResource BoolToVis}}"/>
+
+                                    <StackPanel Visibility="{Binding HasArtwork, Converter={StaticResource InverseBoolToVis}}" HorizontalAlignment="Center" Margin="20">
+                                        <TextBlock Text="🖼️" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                                        <TextBlock Text="No Local Artwork Found" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Place poster.jpg or folder.jpg in the same directory to preview it here."
+                                                   Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" TextAlignment="Center" FontSize="11.5" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Tech Specs / File Properties Card -->
+                            <Border Grid.Column="1" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="1" CornerRadius="8" Padding="18">
+                                <StackPanel>
+                                    <TextBlock Text="File Technical Information" Style="{StaticResource SectionHeader}"/>
+
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="130"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="File Path:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentFilePath}" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Encoding:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding EncodingName}" Foreground="{StaticResource AccentPrimaryBrush}" FontWeight="SemiBold" Margin="0,0,0,10"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Format Mode:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedFileType}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Root XML Tag:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,10"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Metadata.RootElementName}" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,10"/>
+                                    </Grid>
+
+                                    <Button Content="📂 Open Folder in Windows Explorer" Style="{StaticResource ModernButton}" HorizontalAlignment="Left" Margin="0,20,0,0" Click="OpenFolderInExplorer_Click"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+        </Grid>
+
+        <!-- STATUS BAR -->
+        <Border Grid.Row="2" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="0,1,0,0" Padding="10,0">
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Status message -->
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                <!-- Current file path -->
+                <TextBlock Grid.Column="1" Text="{Binding CurrentFilePath}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="14,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="400"/>
+
+                <!-- Encoding badge -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#1E293B" CornerRadius="4" Padding="6,2" Margin="0,0,6,0">
+                        <TextBlock Text="{Binding EncodingName}" Foreground="{StaticResource AccentPrimaryBrush}" FontSize="10.5" FontWeight="SemiBold"/>
+                    </Border>
+                    <Border Background="#1E293B" CornerRadius="4" Padding="6,2">
+                        <TextBlock Text="{Binding SelectedFileType}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5"/>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

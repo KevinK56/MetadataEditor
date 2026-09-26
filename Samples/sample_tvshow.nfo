@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<tvshow>
+  <title>Breaking Bad</title>
+  <originaltitle>Breaking Bad</originaltitle>
+  <rating>9.5</rating>
+  <year>2008</year>
+  <premiered>2008-01-20</premiered>
+  <status>Ended</status>
+  <mpaa>TV-MA</mpaa>
+  <imdbid>tt0903747</imdbid>
+  <tmdbid>1396</tmdbid>
+  <tvdbid>81189</tvdbid>
+  <plot>A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student in order to secure his family's financial future.</plot>
+  <genre>Crime</genre>
+  <genre>Drama</genre>
+  <genre>Thriller</genre>
+  <studio>AMC</studio>
+  <studio>Sony Pictures Television</studio>
+  <actor>
+    <name>Bryan Cranston</name>
+    <role>Walter White</role>
+    <order>0</order>
+  </actor>
+  <actor>
+    <name>Aaron Paul</name>
+    <role>Jesse Pinkman</role>
+    <order>1</order>
+  </actor>
+</tvshow>

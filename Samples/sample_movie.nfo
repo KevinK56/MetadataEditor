@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<movie>
+  <title>Inception</title>
+  <originaltitle>Inception</originaltitle>
+  <sorttitle>Inception</sorttitle>
+  <rating>8.8</rating>
+  <votes>2400000</votes>
+  <year>2010</year>
+  <premiered>2010-07-16</premiered>
+  <released>2010-07-16</released>
+  <plot>A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O., but his tragic past may doom the project and his team to disaster.</plot>
+  <outline>A thief who enters the dreams of others to steal secrets from their subconscious.</outline>
+  <tagline>Your mind is the scene of the crime.</tagline>
+  <runtime>148</runtime>
+  <mpaa>PG-13</mpaa>
+  <id>tt1375666</id>
+  <imdbid>tt1375666</imdbid>
+  <tmdbid>27205</tmdbid>
+  <trailer>https://www.youtube.com/watch?v=YoHD9XEInc0</trailer>
+  <genre>Action</genre>
+  <genre>Sci-Fi</genre>
+  <genre>Thriller</genre>
+  <studio>Warner Bros. Pictures</studio>
+  <studio>Syncopy</studio>
+  <country>United States</country>
+  <country>United Kingdom</country>
+  <director>Christopher Nolan</director>
+  <credits>Christopher Nolan</credits>
+  <actor>
+    <name>Leonardo DiCaprio</name>
+    <role>Dom Cobb</role>
+    <order>0</order>
+    <thumb>https://image.tmdb.org/t/p/w185/wo2hxAzEfvFu2v7ZJNmWryPtVIO.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Joseph Gordon-Levitt</name>
+    <role>Arthur</role>
+    <order>1</order>
+    <thumb>https://image.tmdb.org/t/p/w185/dhv9fW9xUa7L5j7Gk7dI49o3.jpg</thumb>
+  </actor>
+  <actor>
+    <name>Elliot Page</name>
+    <role>Ariadne</role>
+    <order>2</order>
+  </actor>
+  <actor>
+    <name>Tom Hardy</name>
+    <role>Eames</role>
+    <order>3</order>
+  </actor>
+  <!-- Custom Kodi tag to test lossless preservation of extra elements -->
+  <fileinfo>
+    <streamdetails>
+      <video>
+        <codec>h264</codec>
+        <width>1920</width>
+        <height>1080</height>
+      </video>
+      <audio>
+        <codec>dts</codec>
+        <channels>6</channels>
+      </audio>
+    </streamdetails>
+  </fileinfo>
+</movie>

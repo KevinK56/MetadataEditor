@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<album>
+  <title>The Dark Side of the Moon</title>
+  <artist>Pink Floyd</artist>
+  <year>1973</year>
+  <releasedate>1973-03-01</releasedate>
+  <label>Harvest Records</label>
+  <type>Album</type>
+  <rating>9.8</rating>
+  <genre>Progressive Rock</genre>
+  <genre>Psychedelic Rock</genre>
+  <review>One of the most acclaimed albums in history, exploring themes of conflict, greed, time, and mental illness.</review>
+  <track>
+    <position>1</position>
+    <title>Speak to Me</title>
+    <duration>1:05</duration>
+  </track>
+  <track>
+    <position>2</position>
+    <title>Breathe (In the Air)</title>
+    <duration>2:49</duration>
+  </track>
+  <track>
+    <position>3</position>
+    <title>On the Run</title>
+    <duration>3:45</duration>
+  </track>
+  <track>
+    <position>4</position>
+    <title>Time</title>
+    <duration>6:53</duration>
+  </track>
+  <track>
+    <position>5</position>
+    <title>The Great Gig in the Sky</title>
+    <duration>4:44</duration>
+  </track>
+  <track>
+    <position>6</position>
+    <title>Money</title>
+    <duration>6:22</duration>
+  </track>
+</album>

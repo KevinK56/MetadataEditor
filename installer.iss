@@ -42,6 +42,13 @@ PrivilegesRequiredOverridesAllowed=dialog
 CloseApplications=yes
 RestartApplications=yes
 CloseApplicationsFilter=*{#MyAppExeName}
+VersionInfoVersion={#MyAppVersion}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=Metadata Editor Setup Installer
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

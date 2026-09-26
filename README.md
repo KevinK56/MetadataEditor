@@ -98,6 +98,21 @@ release\v1.0.0\portable\MetadataEditor.exe
 
 ---
 
+### 🛡️ Browser Download & Windows SmartScreen Notice
+
+Because **Metadata Editor** is a free, newly published open-source project without a paid commercial EV Code Signing certificate, your browser (Edge, Chrome) or Windows SmartScreen may display an initial safety prompt on newly compiled releases:
+
+#### 1. In Chrome / Edge (Browser Download Bar)
+- Message: *"This file is not commonly downloaded and may be dangerous"* or *"MetadataEditor-Setup... was reported as unsafe"*.
+- **Solution:** Click the three dots `...` (or dropdown arrow) next to the download > Click **Keep** > Click **Keep anyway**.
+
+#### 2. In Windows SmartScreen (When launching the installer)
+- Message: *"Windows protected your PC — Microsoft Defender SmartScreen prevented an unrecognized app from starting"*.
+- **Solution:** Click **More info** (under the text) > Click the **Run anyway** button that appears.
+
+> [!NOTE]
+> This is standard Windows behavior for all newly released open-source software before it accumulates download volume. The application is 100% open source, virus-free, and you can inspect the full source code directly in this repository. Alternatively, you can download the **Portable ZIP archive**, which avoids the installer entirely.
+
 ---
 
 ## 🔄 Automatic Updates & GitHub Releases Hosting

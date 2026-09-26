@@ -220,6 +220,16 @@ jobs:
             - **Standalone Executable:** `MetadataEditor.exe`
               - Single-file self-contained x64 binary without prerequisites.
 
+            ---
+
+            ### 🛡️ First-Time Download / Windows SmartScreen Note
+            As a newly published open-source binary without an expensive commercial code-signing certificate, web browsers and Windows Defender SmartScreen may display an initial download prompt:
+            - **In Chrome/Edge:** If prompted that the file *"is not commonly downloaded"*, click `...` > **Keep** > **Keep anyway**.
+            - **In Windows:** If the blue *"Windows protected your PC"* dialog appears, click **More info** > **Run anyway**.
+            - Alternatively, download the **Portable ZIP Archive** which runs immediately with zero installation.
+
+            ---
+
             ### 📋 Build Info
             - **Release Tag:** `${{ env.TAG }}`
             - **Assembly Version:** `${{ env.VERSION }}`
@@ -284,6 +294,10 @@ jobs:
                 <li><strong>Portable Archive:</strong> <code>MetadataEditor-Portable-$env:TAG.zip</code></li>
                 <li><strong>Standalone Executable:</strong> <code>MetadataEditor.exe</code></li>
               </ul>
+
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 14px; margin: 16px 0; font-size: 12px; color: #475569;">
+                <strong>🛡️ First-Time Download Note:</strong> If your browser prompts that the installer <em>"is not commonly downloaded"</em>, select <strong>Keep &gt; Keep anyway</strong>, and in Windows click <strong>More info &gt; Run anyway</strong>.
+              </div>
 
               <div style="margin-top: 24px; text-align: center;">
                 <a href="https://github.com/KevinK56/MetadataEditor/releases/tag/$env:TAG" style="background: #0284c7; color: #ffffff; padding: 10px 22px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 13px;">View GitHub Release &amp; Assets</a>

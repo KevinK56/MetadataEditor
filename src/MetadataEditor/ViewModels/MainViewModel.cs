@@ -37,8 +37,9 @@ public class MainViewModel : INotifyPropertyChanged
     private string _newWriterText = string.Empty;
     private string _newCountryText = string.Empty;
 
-    // Auto-Update
+    // Auto-Update & Settings
     private readonly UpdateService _updateService = new();
+    private readonly SettingsService _settingsService = new();
     private UpdateInfo? _availableUpdate;
     private bool _isUpdateAvailable;
     private bool _isDownloadingUpdate;
@@ -65,6 +66,16 @@ public class MainViewModel : INotifyPropertyChanged
         DownloadAndInstallUpdateCommand = new RelayCommand(_ => _ = ExecuteDownloadAndInstallUpdate());
         DismissUpdateCommand = new RelayCommand(_ => IsUpdateAvailable = false);
 
+        // Menu Bar & Settings commands
+        OpenSettingsCommand = new RelayCommand(_ => ExecuteOpenSettings(0));
+        OpenThemeSettingsCommand = new RelayCommand(_ => ExecuteOpenSettings(0));
+        OpenUpdateSettingsCommand = new RelayCommand(_ => ExecuteOpenSettings(1));
+        OpenAboutCommand = new RelayCommand(_ => ExecuteOpenSettings(3));
+        ChangeThemeCommand = new RelayCommand(p => ExecuteChangeTheme(p as string));
+        ExitCommand = new RelayCommand(_ => ExecuteExit());
+        ConvertTypeCommand = new RelayCommand(p => ExecuteConvertType(p));
+        ScanArtworkCommand = new RelayCommand(_ => ExecuteScanArtwork());
+
         // List item commands
         AddGenreCommand = new RelayCommand(_ => ExecuteAddGenre());
         RemoveGenreCommand = new RelayCommand(p => ExecuteRemoveGenre(p as string));
@@ -88,15 +99,21 @@ public class MainViewModel : INotifyPropertyChanged
         AddExtraNodeCommand = new RelayCommand(_ => ExecuteAddExtraNode());
         RemoveExtraNodeCommand = new RelayCommand(p => ExecuteRemoveExtraNode(p as XmlExtraItem));
 
-        // Create default empty movie template
-        InitTemplate(NfoFileType.Movie);
+        // Apply saved theme
+        ThemeService.ApplyTheme(_settingsService.Settings.Theme);
 
-        // Check for updates asynchronously after launch
-        _ = Task.Run(async () =>
+        // Create default template using settings
+        InitTemplate(_settingsService.Settings.DefaultFileType);
+
+        // Check for updates asynchronously after launch if enabled
+        if (_settingsService.Settings.CheckForUpdatesOnStartup)
         {
-            await Task.Delay(2500);
-            await CheckForUpdatesAsync(silent: true);
-        });
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2500);
+                await CheckForUpdatesAsync(silent: true);
+            });
+        }
     }
 
     public ObservableCollection<EncodingInfoItem> SupportedEncodings { get; }
@@ -365,6 +382,15 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand FormatXmlCommand { get; }
     public ICommand OpenInBrowserCommand { get; }
 
+    public ICommand OpenSettingsCommand { get; }
+    public ICommand OpenThemeSettingsCommand { get; }
+    public ICommand OpenUpdateSettingsCommand { get; }
+    public ICommand OpenAboutCommand { get; }
+    public ICommand ChangeThemeCommand { get; }
+    public ICommand ExitCommand { get; }
+    public ICommand ConvertTypeCommand { get; }
+    public ICommand ScanArtworkCommand { get; }
+
     public ICommand AddGenreCommand { get; }
     public ICommand RemoveGenreCommand { get; }
     public ICommand AddStudioCommand { get; }
@@ -602,6 +628,19 @@ public class MainViewModel : INotifyPropertyChanged
     {
         try
         {
+            if (_settingsService.Settings.BackupBeforeSave && File.Exists(targetPath))
+            {
+                try
+                {
+                    string backupPath = targetPath + ".bak";
+                    File.Copy(targetPath, backupPath, true);
+                }
+                catch
+                {
+                    // Ignore backup copy errors
+                }
+            }
+
             // If saving in Visual Tab mode and it's XML, serialize visual model
             string textToSave;
             if (SelectedTabIndex == 0 && Metadata.FileType != NfoFileType.PlainText)
@@ -890,6 +929,7 @@ public class MainViewModel : INotifyPropertyChanged
         ArtworkImagePath = null;
         HasArtwork = false;
 
+        if (!_settingsService.Settings.AutoDetectArtwork) return;
         if (string.IsNullOrEmpty(CurrentFilePath)) return;
 
         string dir = Path.GetDirectoryName(CurrentFilePath) ?? string.Empty;
@@ -1032,6 +1072,69 @@ public class MainViewModel : INotifyPropertyChanged
             IsDownloadingUpdate = false;
             UpdateStatusText = "Update failed.";
             MessageBox.Show($"Failed to download or run update:\n{ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public void ExecuteOpenSettings(int tabIndex = 0)
+    {
+        var vm = new SettingsViewModel(_settingsService, tabIndex);
+        var win = new Views.SettingsWindow(vm)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        if (win.ShowDialog() == true)
+        {
+            StatusMessage = "Settings updated successfully.";
+        }
+    }
+
+    public string CurrentTheme => _settingsService.Settings.Theme;
+
+    public void ExecuteChangeTheme(string? theme)
+    {
+        if (!string.IsNullOrEmpty(theme))
+        {
+            _settingsService.Settings.Theme = theme;
+            _settingsService.Save();
+            ThemeService.ApplyTheme(theme);
+            OnPropertyChanged(nameof(CurrentTheme));
+            StatusMessage = $"Theme switched to {theme}.";
+        }
+    }
+
+    public void ExecuteExit()
+    {
+        if (IsModified && !PromptSaveBeforeAction())
+        {
+            return;
+        }
+        Application.Current.Shutdown();
+    }
+
+    public void ExecuteConvertType(object? param)
+    {
+        if (param is string str && Enum.TryParse<NfoFileType>(str, true, out var parsed))
+        {
+            SelectedFileType = parsed;
+            StatusMessage = $"Converted metadata type to {parsed}.";
+        }
+        else if (param is NfoFileType nfoType)
+        {
+            SelectedFileType = nfoType;
+            StatusMessage = $"Converted metadata type to {nfoType}.";
+        }
+    }
+
+    public void ExecuteScanArtwork()
+    {
+        CheckArtwork();
+        if (HasArtwork)
+        {
+            StatusMessage = $"Artwork found: {Path.GetFileName(ArtworkImagePath)}";
+        }
+        else
+        {
+            StatusMessage = "No matching artwork (poster/folder/cover) found in directory.";
         }
     }
 

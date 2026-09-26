@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using MetadataEditor.Services;
 using MetadataEditor.ViewModels;
 
 namespace MetadataEditor;
@@ -35,6 +36,14 @@ public partial class MainWindow : Window
         {
             // Fallback
         }
+
+        Loaded += (s, e) =>
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                ThemeService.ApplyTheme(vm.CurrentTheme);
+            }
+        };
     }
 
     protected override void OnSourceInitialized(EventArgs e)

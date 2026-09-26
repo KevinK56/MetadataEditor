@@ -1,10 +1,21 @@
 ; Inno Setup Script for Metadata Editor Freeware Distribution
-; Download free Inno Setup compiler from: https://jrsoftware.org/isdl.php
+; Supports CLI defines: iscc /DMyAppVersion="2026.09.26.1" /DSourceExeDir="..." /DOutputDir="..." installer.iss
+
+#ifndef MyAppVersion
+#define MyAppVersion "2026.09.26.1"
+#endif
+
+#ifndef SourceExeDir
+#define SourceExeDir "release\single-file"
+#endif
+
+#ifndef OutputDir
+#define OutputDir "release\installer"
+#endif
 
 #define MyAppName "Metadata Editor"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "Freeware"
-#define MyAppURL "https://github.com"
+#define MyAppPublisher "KevinK56"
+#define MyAppURL "https://github.com/KevinK56/MetadataEditor"
 #define MyAppExeName "MetadataEditor.exe"
 
 [Setup]
@@ -14,13 +25,13 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
-AppUpdatesURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE
-OutputDir=release\v1.0.0\installer
-OutputBaseFilename=MetadataEditor_Setup_v1.0.0
+OutputDir={#OutputDir}
+OutputBaseFilename=MetadataEditor-Setup-v{#MyAppVersion}
 SetupIconFile=src\MetadataEditor\Resources\app.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -28,6 +39,9 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+CloseApplications=yes
+RestartApplications=yes
+CloseApplicationsFilter=*{#MyAppExeName}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -37,7 +51,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "associate_nfo"; Description: "Associate with .nfo files (Open with Metadata Editor)"; GroupDescription: "File Associations:"
 
 [Files]
-Source: "release\v1.0.0\single-file\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceExeDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "src\MetadataEditor\Resources\app.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -57,3 +71,4 @@ Root: HKA; Subkey: "Software\Classes\MetadataEditor.nfo\shell\Edit with Metadata
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+

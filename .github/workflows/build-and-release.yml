@@ -1,0 +1,108 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build, Package & Publish Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Calculate Release Version & Tag
+        id: versioning
+        shell: pwsh
+        run: |
+          $commitCount = (git rev-list --count HEAD).Trim()
+          $dateStr = (Get-Date -Format "yyyy.MM.dd")
+          $version = "$dateStr.$commitCount"
+          $tag = "v$version"
+          Write-Host "Calculated Version: $version"
+          Write-Host "Calculated Tag: $tag"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Run Unit Tests
+        run: dotnet test MetadataEditor.sln --configuration Release --verbosity normal
+
+      - name: Publish Single-File Executable (win-x64)
+        shell: pwsh
+        run: |
+          dotnet publish src/MetadataEditor/MetadataEditor.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:AssemblyVersion="${{ env.VERSION }}" `
+            -p:FileVersion="${{ env.VERSION }}" `
+            -p:InformationalVersion="${{ env.TAG }}" `
+            -o artifacts/single-file
+
+      - name: Package Portable ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/portable-stage
+          Copy-Item "artifacts/single-file/MetadataEditor.exe" "artifacts/portable-stage/MetadataEditor.exe"
+          Copy-Item "LICENSE" "artifacts/portable-stage/LICENSE.txt"
+          Copy-Item "README.md" "artifacts/portable-stage/README.md"
+          Compress-Archive -Path "artifacts/portable-stage/*" -DestinationPath "artifacts/MetadataEditor-Portable-${{ env.TAG }}.zip"
+
+      - name: Build Inno Setup Installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            Write-Host "Inno Setup not found at default location. Installing via Chocolatey..."
+            choco install innosetup -y --no-progress
+            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc /DMyAppVersion="${{ env.VERSION }}" /DSourceExeDir="artifacts\single-file" /DOutputDir="artifacts" installer.iss
+
+      - name: Create GitHub Release & Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Release ${{ env.TAG }}
+          body: |
+            ## Metadata Editor ${{ env.TAG }}
+            Automated build triggered by commit against `master`.
+
+            ### 📦 Downloads
+            - **Setup Installer (Recommended):** `MetadataEditor-Setup-${{ env.TAG }}.exe`
+              - Full Windows installer with desktop shortcut and optional `.nfo` file associations.
+              - Supports automatic silent update checks and seamless in-place updates.
+            - **Portable Archive:** `MetadataEditor-Portable-${{ env.TAG }}.zip`
+              - Zero-installation portable edition. Extract anywhere and run.
+            - **Standalone Executable:** `MetadataEditor.exe`
+              - Single-file self-contained x64 binary without prerequisites.
+
+            ### 📋 Build Info
+            - **Release Tag:** `${{ env.TAG }}`
+            - **Assembly Version:** `${{ env.VERSION }}`
+            - **Commit SHA:** `${{ github.sha }}`
+          files: |
+            artifacts/MetadataEditor-Setup-${{ env.TAG }}.exe
+            artifacts/MetadataEditor-Portable-${{ env.TAG }}.zip
+            artifacts/single-file/MetadataEditor.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

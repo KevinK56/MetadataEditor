@@ -98,6 +98,28 @@ release\v1.0.0\portable\MetadataEditor.exe
 
 ---
 
+---
+
+## 🔄 Automatic Updates & GitHub Releases Hosting
+
+### Automatic Background Updates
+- When **Metadata Editor** starts, it seamlessly checks GitHub Releases (`https://api.github.com/repos/KevinK56/MetadataEditor/releases/latest`) in the background.
+- If a newer version is found, an update banner appears with version information, release notes link, and a **"⬇️ Download & Install"** button.
+- You can also manually trigger an update check at any time by clicking the version badge (e.g. `🔄 v2026.09.26.2`) in the bottom-right status bar.
+- Clicking install downloads the setup package with a progress bar and automatically launches the installer to upgrade seamlessly in place.
+
+### Continuous Integration & Release Automation (GitHub Actions)
+- Every check-in / push against `master` automatically triggers the GitHub Actions workflow [`.github/workflows/build-and-release.yml`](.github/workflows/build-and-release.yml).
+- **Automated Versioning Scheme**:
+  - The build number is dynamically calculated from the build date and git commit count: `YYYY.MM.DD.<CommitCount>` (e.g. `2026.09.26.3` / Tag `v2026.09.26.3`).
+  - Sets the Windows `AssemblyVersion`, `FileVersion`, and `InformationalVersion`.
+- **Automated Assets Published to GitHub Releases**:
+  1. `MetadataEditor-Setup-v<Version>.exe`: Inno Setup installer with automatic application closing/restarting for seamless updates.
+  2. `MetadataEditor-Portable-v<Version>.zip`: Portable zero-install zip bundle.
+  3. `MetadataEditor.exe`: Standalone self-contained single-file binary.
+
+---
+
 ## 🛠️ Building from Source
 
 To build or publish using the .NET CLI:
@@ -109,8 +131,9 @@ dotnet build MetadataEditor.sln
 # Run automated tests
 dotnet test MetadataEditor.sln
 
-# Or run the convenient build batch script:
+# Or run the convenient build batch scripts (uses dynamic date + commit count versioning):
 build-single-file.bat
+build-portable.bat
 ```
 
 ---
@@ -119,16 +142,24 @@ build-single-file.bat
 
 To distribute this application as professional freeware:
 
-1. **Standalone Portable Zip**:
-   - Simply zip `release\v1.0.0\single-file\MetadataEditor.exe`, `README.md`, and `LICENSE`. Users can extract and run it immediately from a USB flash drive or any folder.
+1. **GitHub Releases Hosting (Recommended)**:
+   - Push your changes to `master` on GitHub.
+   - The CI/CD pipeline builds and publishes portable ZIPs and installers automatically to `https://github.com/KevinK56/MetadataEditor/releases`.
 
-2. **Inno Setup Installer (`installer.iss`)**:
+2. **Standalone Portable Zip**:
+   - Simply download or zip `MetadataEditor.exe`, `README.md`, and `LICENSE`. Users can extract and run it immediately from a USB flash drive or any folder.
+
+3. **Inno Setup Installer (`installer.iss`)**:
    - Install the free [Inno Setup Compiler](https://jrsoftware.org/isdl.php).
-   - Right-click `installer.iss` and click **Compile**.
-   - This creates `release\v1.0.0\installer\MetadataEditor_Setup_v1.0.0.exe` with:
+   - Compile using `installer.iss` or run:
+     ```cmd
+     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="2026.09.26.1" installer.iss
+     ```
+   - This creates `MetadataEditor-Setup-v<Version>.exe` with:
      - Windows Start Menu & Desktop shortcuts
      - Context menu integration ("Edit with Metadata Editor" when right-clicking `.nfo` files)
      - Clean Windows Add/Remove Programs uninstaller
+     - Safe update handling (`CloseApplications=yes`, `RestartApplications=yes`)
 
 ---
 

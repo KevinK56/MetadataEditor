@@ -25,6 +25,7 @@
     <Window.Resources>
         <views:BoolToVisConverter x:Key="BoolToVis"/>
         <views:BoolToVisConverter x:Key="InverseBoolToVis" Invert="True"/>
+        <views:InverseBoolConverter x:Key="InverseBool"/>
         <views:StringNullOrEmptyToVisConverter x:Key="StringNullOrEmptyToVis"/>
     </Window.Resources>
 
@@ -39,6 +40,8 @@
     <Grid Background="{StaticResource BgDarkBrush}">
         <Grid.RowDefinitions>
             <!-- Top App / Action Bar -->
+            <RowDefinition Height="Auto"/>
+            <!-- Auto-Update Notification Banner -->
             <RowDefinition Height="Auto"/>
             <!-- Main Content Area -->
             <RowDefinition Height="*"/>
@@ -168,8 +171,47 @@
             </Grid>
         </Border>
 
-        <!-- MAIN WORKSPACE SPLIT (Left Sidebar + Center Editor) -->
-        <Grid Grid.Row="1">
+        <!-- AUTO-UPDATE NOTIFICATION BANNER (Row 1) -->
+        <Border Grid.Row="1" Background="#1E3A8A" BorderBrush="#3B82F6" BorderThickness="0,0,0,1" Padding="14,8"
+                Visibility="{Binding IsUpdateAvailable, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="🚀" FontSize="15" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Update Available: " FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding AvailableUpdate.ReleaseTitle}" FontWeight="Bold" Foreground="#93C5FD" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Download Progress Indicator -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0"
+                            Visibility="{Binding IsDownloadingUpdate, Converter={StaticResource BoolToVis}}">
+                    <ProgressBar Value="{Binding UpdateDownloadProgress}" Maximum="100" Width="140" Height="8" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding UpdateStatusText}" Foreground="#BFDBFE" FontSize="11.5" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Actions -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource PrimaryButton}" Content="⬇️ Download &amp; Install"
+                            Command="{Binding DownloadAndInstallUpdateCommand}"
+                            IsEnabled="{Binding IsDownloadingUpdate, Converter={StaticResource InverseBool}}"
+                            Padding="10,4" MinHeight="28" Margin="0,0,8,0"/>
+                    <Button Style="{StaticResource ModernButton}" Content="Release Notes"
+                            Command="{Binding OpenInBrowserCommand}" CommandParameter="{Binding AvailableUpdate.ReleasePageUrl}"
+                            Padding="10,4" MinHeight="28" Margin="0,0,8,0"/>
+                    <Button Style="{StaticResource ModernButton}" Content="✕"
+                            Command="{Binding DismissUpdateCommand}"
+                            Padding="8,4" MinHeight="28" ToolTip="Dismiss"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- MAIN WORKSPACE SPLIT (Left Sidebar + Center Editor) (Row 2) -->
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <!-- Left Sidebar: Folder Files Browser -->
                 <ColumnDefinition Width="280" MinWidth="200" MaxWidth="450"/>
@@ -846,10 +888,11 @@
         </Grid>
 
         <!-- STATUS BAR -->
-        <Border Grid.Row="2" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="0,1,0,0" Padding="10,0">
+        <Border Grid.Row="3" Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderDarkBrush}" BorderThickness="0,1,0,0" Padding="10,0">
             <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -858,10 +901,10 @@
                 <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
 
                 <!-- Current file path -->
-                <TextBlock Grid.Column="1" Text="{Binding CurrentFilePath}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="14,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="400"/>
+                <TextBlock Grid.Column="1" Text="{Binding CurrentFilePath}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="14,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="350"/>
 
                 <!-- Encoding badge -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
                     <Border Background="#1E293B" CornerRadius="4" Padding="6,2" Margin="0,0,6,0">
                         <TextBlock Text="{Binding EncodingName}" Foreground="{StaticResource AccentPrimaryBrush}" FontSize="10.5" FontWeight="SemiBold"/>
                     </Border>
@@ -869,6 +912,16 @@
                         <TextBlock Text="{Binding SelectedFileType}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10.5"/>
                     </Border>
                 </StackPanel>
+
+                <!-- Version badge & Check for Updates Button -->
+                <Button Grid.Column="3" Style="{StaticResource ModernButton}" Command="{Binding CheckForUpdatesCommand}"
+                        Padding="8,2" MinHeight="22" VerticalAlignment="Center" Cursor="Hand"
+                        ToolTip="Check GitHub for Updates">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="🔄 " FontSize="9" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding AppVersionString, StringFormat='v{0}'}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </Button>
             </Grid>
         </Border>
     </Grid>

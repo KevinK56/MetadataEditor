@@ -1,4 +1,25 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="app.svg" />
+    <File Path="build-portable.bat" />
+    <File Path="build-single-file.bat" />
+    <File Path="installer.iss" />
+    <File Path="LICENSE" />
+    <File Path="nuget.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/.github/workflows/">
+    <File Path=".github/workflows/build-and-release.yml" />
+  </Folder>
+  <Folder Name="/Samples/">
+    <File Path="Samples/sample_album.nfo" />
+    <File Path="Samples/sample_episode.nfo" />
+    <File Path="Samples/sample_movie.nfo" />
+    <File Path="Samples/sample_scene_ascii.nfo" />
+    <File Path="Samples/sample_tvshow.nfo" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/MetadataEditor/MetadataEditor.csproj" />
   </Folder>

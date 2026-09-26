@@ -37,6 +37,14 @@ public class MainViewModel : INotifyPropertyChanged
     private string _newWriterText = string.Empty;
     private string _newCountryText = string.Empty;
 
+    // Auto-Update
+    private readonly UpdateService _updateService = new();
+    private UpdateInfo? _availableUpdate;
+    private bool _isUpdateAvailable;
+    private bool _isDownloadingUpdate;
+    private double _updateDownloadProgress;
+    private string _updateStatusText = string.Empty;
+
     public MainViewModel()
     {
         SupportedEncodings = new ObservableCollection<EncodingInfoItem>(FileEncodingDetector.GetSupportedEncodings());
@@ -51,6 +59,11 @@ public class MainViewModel : INotifyPropertyChanged
         ReloadCommand = new RelayCommand(_ => ExecuteReload(), () => !string.IsNullOrEmpty(CurrentFilePath));
         FormatXmlCommand = new RelayCommand(_ => ExecuteFormatXml());
         OpenInBrowserCommand = new RelayCommand(p => ExecuteOpenInBrowser(p as string));
+
+        // Auto-update commands
+        CheckForUpdatesCommand = new RelayCommand(_ => _ = CheckForUpdatesAsync(silent: false));
+        DownloadAndInstallUpdateCommand = new RelayCommand(_ => _ = ExecuteDownloadAndInstallUpdate());
+        DismissUpdateCommand = new RelayCommand(_ => IsUpdateAvailable = false);
 
         // List item commands
         AddGenreCommand = new RelayCommand(_ => ExecuteAddGenre());
@@ -77,6 +90,13 @@ public class MainViewModel : INotifyPropertyChanged
 
         // Create default empty movie template
         InitTemplate(NfoFileType.Movie);
+
+        // Check for updates asynchronously after launch
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(2500);
+            await CheckForUpdatesAsync(silent: true);
+        });
     }
 
     public ObservableCollection<EncodingInfoItem> SupportedEncodings { get; }
@@ -898,6 +918,120 @@ public class MainViewModel : INotifyPropertyChanged
                 HasArtwork = true;
                 return;
             }
+        }
+    }
+
+    public bool IsUpdateAvailable
+    {
+        get => _isUpdateAvailable;
+        set => SetField(ref _isUpdateAvailable, value);
+    }
+
+    public UpdateInfo? AvailableUpdate
+    {
+        get => _availableUpdate;
+        set => SetField(ref _availableUpdate, value);
+    }
+
+    public bool IsDownloadingUpdate
+    {
+        get => _isDownloadingUpdate;
+        set => SetField(ref _isDownloadingUpdate, value);
+    }
+
+    public double UpdateDownloadProgress
+    {
+        get => _updateDownloadProgress;
+        set => SetField(ref _updateDownloadProgress, value);
+    }
+
+    public string UpdateStatusText
+    {
+        get => _updateStatusText;
+        set => SetField(ref _updateStatusText, value);
+    }
+
+    public string AppVersionString => UpdateService.GetCurrentVersionString();
+
+    public ICommand CheckForUpdatesCommand { get; }
+    public ICommand DownloadAndInstallUpdateCommand { get; }
+    public ICommand DismissUpdateCommand { get; }
+
+    public async Task CheckForUpdatesAsync(bool silent = false)
+    {
+        try
+        {
+            if (!silent)
+            {
+                StatusMessage = "Checking for updates on GitHub...";
+            }
+
+            var update = await _updateService.CheckForUpdatesAsync();
+            if (update != null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    AvailableUpdate = update;
+                    IsUpdateAvailable = true;
+                    UpdateStatusText = $"Version v{update.LatestVersion} available!";
+                    StatusMessage = $"Update available: v{update.LatestVersion}";
+                });
+            }
+            else if (!silent)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    StatusMessage = "You are on the latest version.";
+                    MessageBox.Show(
+                        $"You are running the latest version of Metadata Editor (v{AppVersionString}).",
+                        "No Updates Available",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                });
+            }
+        }
+        catch
+        {
+            if (!silent)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    StatusMessage = "Could not check for updates.";
+                });
+            }
+        }
+    }
+
+    public async Task ExecuteDownloadAndInstallUpdate()
+    {
+        if (AvailableUpdate == null) return;
+
+        if (string.IsNullOrEmpty(AvailableUpdate.InstallerUrl))
+        {
+            ExecuteOpenInBrowser(AvailableUpdate.ReleasePageUrl);
+            return;
+        }
+
+        try
+        {
+            IsDownloadingUpdate = true;
+            UpdateStatusText = "Downloading update...";
+            var progress = new Progress<double>(p =>
+            {
+                UpdateDownloadProgress = p;
+                UpdateStatusText = $"Downloading update... {p:0}%";
+            });
+
+            string installerPath = await _updateService.DownloadInstallerAsync(AvailableUpdate.InstallerUrl, progress);
+            UpdateStatusText = "Launching installer...";
+
+            UpdateService.LaunchInstallerAndShutdown(installerPath);
+        }
+        catch (Exception ex)
+        {
+            IsDownloadingUpdate = false;
+            UpdateStatusText = "Update failed.";
+            MessageBox.Show($"Failed to download or run update:\n{ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

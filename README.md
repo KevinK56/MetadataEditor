@@ -196,7 +196,7 @@ To distribute this application as professional freeware:
 If you find **Metadata Editor** helpful for organizing your home theater, Plex, Kodi, or Jellyfin library and would like to support ongoing development, maintenance, and new features, any contribution is warmly appreciated!
 
 - **GitHub Sponsors:** Sponsor directly on GitHub via the **💖 Sponsor** button at the top of the repository.
-- **Support / Donate:** You can also sponsor via PayPal, Ko-fi, or Buy Me a Coffee.
+- **Support / Donate:** You can also sponsor via PayPal.
 
 Thank you for supporting free and open-source software!
 

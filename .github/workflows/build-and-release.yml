@@ -3,26 +3,39 @@ name: Build & Release
 on:
   push:
     branches: [ "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/CODEOWNERS'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [ "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/CODEOWNERS'
+      - '.gitignore'
+      - 'LICENSE'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    name: Build, Package & Publish Release
+  # JOB 1: CHANGE DETECTION & VERSIONING
+  detect-changes:
+    name: 🔍 Detect Changes & Versioning
     runs-on: windows-latest
-
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      version: ${{ steps.versioning.outputs.version }}
+      tag: ${{ steps.versioning.outputs.tag }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
 
       - name: Calculate Release Version & Tag
         id: versioning
@@ -34,11 +47,84 @@ jobs:
           $tag = "v$version"
           Write-Host "Calculated Version: $version"
           Write-Host "Calculated Tag: $tag"
-          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Check for Code Changes
+        id: check
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            Write-Host "Manual workflow dispatch trigger. Proceeding with full build."
+            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
+
+          $hasParent = (git rev-parse --verify HEAD~1 2>$null)
+          if (-not $hasParent) {
+            Write-Host "Initial repository commit. Proceeding with build."
+            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
+
+          $diffTarget = if ('${{ github.event_name }}' -eq 'pull_request') { 'origin/${{ github.base_ref }}' } else { 'HEAD~1' }
+          $changedFiles = git diff --name-only $diffTarget HEAD
+          Write-Host "Changed files since $diffTarget:"
+          $changedFiles | ForEach-Object { Write-Host " - $_" }
+
+          $codeChanges = $changedFiles | Where-Object {
+            $_ -notmatch '\.md$' -and
+            $_ -notmatch '^docs/' -and
+            $_ -notmatch '^\.github/CODEOWNERS$' -and
+            $_ -notmatch '^\.gitignore$' -and
+            $_ -notmatch '^LICENSE$'
+          }
+
+          if ($codeChanges) {
+            Write-Host "Code changes detected ($($codeChanges.Count) file(s)). Proceeding with build."
+            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            Write-Host "Only documentation, markdown, or metadata files changed. Skipping build and release."
+            "should_build=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+  # JOB 2: RUN UNIT TESTS
+  test:
+    name: 🧪 Run Unit Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_build == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Run Unit Tests
         run: dotnet test MetadataEditor.sln --configuration Release --verbosity normal
+
+  # JOB 3: BUILD, PACKAGE & ASSEMBLE INSTALLER
+  build-package:
+    name: 📦 Build, Package & Installer
+    needs: [detect-changes, test]
+    if: needs.detect-changes.outputs.should_build == 'true'
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.detect-changes.outputs.version }}
+      TAG: ${{ needs.detect-changes.outputs.tag }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
       - name: Publish Single-File Executable (win-x64)
         shell: pwsh
@@ -75,6 +161,38 @@ jobs:
           }
           & $iscc /DMyAppVersion="${{ env.VERSION }}" /DSourceExeDir="artifacts\single-file" /DOutputDir="artifacts" installer.iss
 
+      - name: Stage Release Assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release-stage
+          Copy-Item "artifacts/MetadataEditor-Setup-${{ env.TAG }}.exe" "artifacts/release-stage/"
+          Copy-Item "artifacts/MetadataEditor-Portable-${{ env.TAG }}.zip" "artifacts/release-stage/"
+          Copy-Item "artifacts/single-file/MetadataEditor.exe" "artifacts/release-stage/"
+          Get-ChildItem -Path artifacts/release-stage
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: artifacts/release-stage/*
+          if-no-files-found: error
+
+  # JOB 4: PUBLISH GITHUB RELEASE
+  release:
+    name: 🚀 Publish GitHub Release
+    needs: [detect-changes, test, build-package]
+    if: needs.detect-changes.outputs.should_build == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch')
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.detect-changes.outputs.version }}
+      TAG: ${{ needs.detect-changes.outputs.tag }}
+    steps:
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: release-assets
+
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
         with:
@@ -98,11 +216,94 @@ jobs:
             - **Assembly Version:** `${{ env.VERSION }}`
             - **Commit SHA:** `${{ github.sha }}`
           files: |
-            artifacts/MetadataEditor-Setup-${{ env.TAG }}.exe
-            artifacts/MetadataEditor-Portable-${{ env.TAG }}.zip
-            artifacts/single-file/MetadataEditor.exe
+            release-assets/*
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Release Email Notification via StarSystems Comms API
+        if: always() && needs.detect-changes.outputs.should_build == 'true'
+        shell: pwsh
+        env:
+          COMMS_API_KEY: ${{ secrets.COMMS_API_KEY }}
+          COMMS_API_URL: ${{ secrets.COMMS_API_URL }}
+          TAG: ${{ needs.detect-changes.outputs.tag }}
+          VERSION: ${{ needs.detect-changes.outputs.version }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:COMMS_API_KEY) -or [string]::IsNullOrWhiteSpace($env:COMMS_API_URL)) {
+            Write-Warning "COMMS_API_KEY or COMMS_API_URL secret is not configured in GitHub Repository Secrets. Skipping email dispatch."
+            exit 0
+          }
+
+          $statusEmoji = if ($env:JOB_STATUS -eq "success") { "✅ Succeeded" } else { "❌ Failed" }
+          $subject = "Metadata Editor $env:TAG - Build & Release $statusEmoji"
+
+          $htmlBody = @"
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="background: linear-gradient(135deg, #0284C7, #1D4ED8); padding: 18px 24px; border-radius: 6px; color: #ffffff;">
+              <h1 style="margin: 0; font-size: 20px;">🚀 Metadata Editor Build &amp; Release</h1>
+              <p style="margin: 4px 0 0 0; opacity: 0.9; font-size: 13px;">Automated Delivery Pipeline Notification</p>
+            </div>
+            
+            <div style="padding: 20px 4px;">
+              <p style="font-size: 14px; color: #1e293b;">The automated build and release pipeline for <strong>Metadata Editor</strong> has completed with status: <strong style="color: $(if ($env:JOB_STATUS -eq 'success') { '#16a34a' } else { '#dc2626' });">$statusEmoji</strong>.</p>
+              
+              <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 8px 0; color: #64748b; width: 140px;">Release Tag:</td>
+                  <td style="padding: 8px 0; font-weight: 600; color: #0284c7;">$env:TAG</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 8px 0; color: #64748b;">Assembly Version:</td>
+                  <td style="padding: 8px 0; font-weight: 600; color: #1e293b;">$env:VERSION</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 8px 0; color: #64748b;">Commit SHA:</td>
+                  <td style="padding: 8px 0; font-family: monospace; color: #475569;">${{ github.sha }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 8px 0; color: #64748b;">Triggered By:</td>
+                  <td style="padding: 8px 0; color: #1e293b;">${{ github.actor }}</td>
+                </tr>
+              </table>
+
+              <h3 style="font-size: 14px; color: #0f172a; margin: 20px 0 10px 0;">📦 Packaged Release Assets:</h3>
+              <ul style="font-size: 13px; color: #334155; line-height: 1.6; padding-left: 20px;">
+                <li><strong>Setup Installer:</strong> <code>MetadataEditor-Setup-$env:TAG.exe</code></li>
+                <li><strong>Portable Archive:</strong> <code>MetadataEditor-Portable-$env:TAG.zip</code></li>
+                <li><strong>Standalone Executable:</strong> <code>MetadataEditor.exe</code></li>
+              </ul>
+
+              <div style="margin-top: 24px; text-align: center;">
+                <a href="https://github.com/KevinK56/MetadataEditor/releases/tag/$env:TAG" style="background: #0284c7; color: #ffffff; padding: 10px 22px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-block; font-size: 13px;">View GitHub Release &amp; Assets</a>
+              </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Sent automatically by GitHub Actions via StarSystems Comms API.</p>
+          </div>
+          "@
+
+          $payload = @{
+            sourceSystem = "MetadataEditor-CI"
+            to = "kevin.koekemoer1@outlook.com, kevinkoekemoer@starsystems.co.za"
+            subject = $subject
+            htmlBody = $htmlBody
+            referenceId = "RELEASE-$env:TAG"
+          } | ConvertTo-Json -Depth 5
+
+          $headers = @{
+            "X-Api-Key" = $env:COMMS_API_KEY
+            "Content-Type" = "application/json; charset=utf-8"
+          }
+
+          try {
+            $response = Invoke-RestMethod -Uri $env:COMMS_API_URL -Method Post -Headers $headers -Body $payload
+            Write-Host "Comms API Notification successfully sent! Response:"
+            $response | ConvertTo-Json
+          } catch {
+            Write-Warning "Failed to dispatch email notification via StarSystems Comms API: $_"
+          }
 

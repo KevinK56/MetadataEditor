@@ -4,42 +4,12 @@ A powerful, universal Windows desktop application to view, edit, convert, and sa
 
 ---
 
-## 📁 Repository Structure
+## Preview
 
-```
-c:\Dev\MetadataEditor\
-├── MetadataEditor.sln                    # Standard Visual Studio Solution (at root, above src)
-├── MetadataEditor.slnx                   # Modern VS 2022 / .NET 10 Solution
-│
-├── src/                                  # All source code
-│   ├── MetadataEditor/                   # Main WPF Application Project
-│   │   ├── MetadataEditor.csproj
-│   │   ├── app.manifest                  # asInvoker & PerMonitorV2 High-DPI
-│   │   ├── App.xaml / App.xaml.cs
-│   │   ├── MainWindow.xaml / .cs
-│   │   ├── Models/                       # Domain models & extra XML preservation
-│   │   ├── Services/                     # NFO parser, serializer & encoding detector
-│   │   ├── ViewModels/                   # MVVM ViewModel & commands
-│   │   ├── Views/                        # Value converters
-│   │   ├── Styles/                       # Dark theme XAML styles
-│   │   └── Resources/                    # Multi-resolution app.ico
-│   └── tests/                            # Automated test suite
-│       └── MetadataEditor.Tests/
-│           ├── MetadataEditor.Tests.csproj
-│           └── NfoParsingTests.cs
-│
-├── release/                              # Release distributions organized by build/version
-│   └── v1.0.0/
-│       ├── single-file/                  # Standalone self-contained MetadataEditor.exe (zero dependencies)
-│       └── portable/                     # Lightweight framework-dependent build (~200 KB)
-│
-├── Samples/                              # Sample test NFO files (Movie, TV, Episode, Music, Scene ASCII)
-├── build-single-file.bat                 # 1-click batch script to produce standalone release
-├── build-portable.bat                    # 1-click batch script to produce lightweight release
-├── installer.iss                         # Inno Setup freeware installer script
-├── LICENSE                               # Permissive MIT Freeware License
-└── README.md                             # Documentation
-```
+<img width="1915" height="1032" alt="image" src="https://github.com/user-attachments/assets/a712a473-06a1-4b1e-a653-1628fdf2e5aa" />
+
+<img width="1918" height="1033" alt="image" src="https://github.com/user-attachments/assets/dcd2c29b-0c6d-4e2a-af57-d8c3f8de47aa" />
+
 
 ---
 
@@ -196,7 +166,7 @@ To distribute this application as professional freeware:
 If you find **Metadata Editor** helpful for organizing your home theater, Plex, Kodi, or Jellyfin library and would like to support ongoing development, maintenance, and new features, any contribution is warmly appreciated!
 
 - **GitHub Sponsors:** Sponsor directly on GitHub via the **💖 Sponsor** button at the top of the repository.
-- **Support / Donate:** You can also sponsor via PayPal, Ko-fi, or Buy Me a Coffee.
+- **Support / Donate:** You can also sponsor via PayPal.
 
 Thank you for supporting free and open-source software!
 

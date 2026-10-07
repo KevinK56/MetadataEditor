@@ -36,8 +36,8 @@ A powerful, universal Windows desktop application to view, edit, convert, and sa
 - **Folder Scanner & Media Browser**:
   - Open an entire media directory (or drag & drop a folder) to scan and list all `.nfo` files with instant search and type filters (*All*, *Movies*, *TV Shows*, *Episodes*, *Music*, *Text*).
 
-- **Local Artwork Detection**:
-  - Automatically discovers and displays posters/cover art (`poster.jpg`, `folder.jpg`, `cover.jpg`, `<name>-poster.jpg`) alongside metadata.
+- **Local Artwork Gallery & NFO XML Linking**:
+  - Automatically discovers and displays all local media artwork (`poster.jpg`, `fanart.jpg`, `clearlogo.png`, `landscape.jpg`, `banner.jpg`, `clearart.png`, `discart.png`, `keyart.jpg`, and `<name>-<type>.*`) with dimensions and file size, plus one-click linking into NFO XML (`<thumb aspect="...">` and `<fanart>`).
 
 - **Encoding Support**:
   - Auto-detects UTF-8, UTF-8 with BOM, DOS CP437, Windows-1252 (ANSI), and UTF-16. Preserves original encoding on save.
@@ -174,4 +174,4 @@ Thank you for supporting free and open-source software!
 
 ## 📄 License
 
-This software is released under the **MIT License** — 100% free to use, modify, and distribute as freeware.
+This software is licensed under the **GNU General Public License v3.0 (GPL-3.0)** — see the [LICENSE](LICENSE) file for details.

@@ -15,6 +15,7 @@
     <Description>Universal NFO Metadata Viewer and Editor for Movies, TV Shows, Music, and Scene ASCII NFOs.</Description>
     <Company>KevinK56</Company>
     <Copyright>Copyright © 2026 KevinK56</Copyright>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     <InformationalVersion>1.0.0</InformationalVersion>

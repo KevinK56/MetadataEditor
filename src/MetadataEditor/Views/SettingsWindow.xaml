@@ -215,7 +215,7 @@
                                     <TextBlock Grid.Row="0" Grid.Column="1" Text="KevinK56" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5" Margin="0,0,0,6"/>
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="License:" Foreground="{DynamicResource TextMutedBrush}" FontSize="11.5"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="MIT License (100% Free &amp; Open Source Software)" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="GNU General Public License v3.0 (GPL-3.0)" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11.5"/>
                                 </Grid>
 
                                 <!-- Action Links -->

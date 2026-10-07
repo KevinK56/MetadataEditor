@@ -242,7 +242,7 @@ public static class NfoParserService
             string local = elem.Name.LocalName;
             if (!knownElements.Contains(local))
             {
-                bool isBlock = elem.HasElements;
+                bool isBlock = elem.HasElements || elem.HasAttributes;
                 string val = isBlock ? elem.ToString(SaveOptions.DisableFormatting) : elem.Value;
                 model.ExtraNodes.Add(new XmlExtraItem
                 {

@@ -194,5 +194,36 @@ public class NfoParsingTests
         Assert.Contains("<title>Converted Movie</title>", xml);
         Assert.Contains("<year>2024</year>", xml);
     }
+
+    [Fact]
+    public void TestExtraNodeAttributesPreservedOnRoundtrip()
+    {
+        string rawXml = @"<?xml version=""1.0"" encoding=""utf-8""?>
+<movie>
+  <title>A Nightmare on Elm Street: The Dream Child</title>
+  <uniqueid type=""imdb"">tt0097981</uniqueid>
+  <uniqueid type=""tmdb"" default=""true"">10160</uniqueid>
+  <thumb aspect=""poster"">poster.jpg</thumb>
+  <thumb aspect=""clearlogo"">clearlogo.png</thumb>
+  <thumb aspect=""landscape"">landscape.jpg</thumb>
+  <fanart>
+    <thumb>fanart.jpg</thumb>
+  </fanart>
+</movie>";
+
+        var doc = System.Xml.Linq.XDocument.Parse(rawXml);
+        var meta = NfoParserService.ParseXmlToMetadata(doc, rawXml);
+
+        Assert.Contains(meta.ExtraNodes, x => x.TagName == "thumb" && x.IsXmlBlock && x.TagValue.Contains("aspect=\"poster\""));
+        Assert.Contains(meta.ExtraNodes, x => x.TagName == "uniqueid" && x.IsXmlBlock && x.TagValue.Contains("type=\"tmdb\""));
+        Assert.Contains(meta.ExtraNodes, x => x.TagName == "fanart" && x.IsXmlBlock && x.TagValue.Contains("<thumb>fanart.jpg</thumb>"));
+
+        string serialized = NfoParserService.SerializeToXml(meta);
+        Assert.Contains("<thumb aspect=\"poster\">poster.jpg</thumb>", serialized);
+        Assert.Contains("<thumb aspect=\"clearlogo\">clearlogo.png</thumb>", serialized);
+        Assert.Contains("<thumb aspect=\"landscape\">landscape.jpg</thumb>", serialized);
+        Assert.Contains("<uniqueid type=\"tmdb\" default=\"true\">10160</uniqueid>", serialized);
+        Assert.Contains("<fanart>", serialized);
+    }
 }
 

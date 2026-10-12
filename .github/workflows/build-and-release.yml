@@ -3,21 +3,26 @@ name: Build & Release
 on:
   push:
     branches: [ "master" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/CODEOWNERS'
-      - '.gitignore'
-      - 'LICENSE'
+    # Whitelist actual code, solution, and installer files
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '*.sln'
+      - 'installer.iss'
   pull_request:
     branches: [ "master" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/CODEOWNERS'
-      - '.gitignore'
-      - 'LICENSE'
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '*.sln'
+      - 'installer.iss'
   workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force release even if no code changes detected'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -37,8 +42,65 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for Code Changes
+        id: check
+        shell: pwsh
+        run: |
+          $isDispatch = '${{ github.event_name }}' -eq 'workflow_dispatch'
+          $isForce = '${{ github.event.inputs.force_deploy }}' -eq 'true'
+
+          if ($isDispatch -and $isForce) {
+            Write-Host "Manual workflow dispatch with force_deploy=true. Proceeding with full build."
+            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
+
+          # Determine diff target
+          $diffTarget = $null
+
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            $diffTarget = 'origin/${{ github.base_ref }}'
+          } else {
+            # For master pushes and workflow_dispatch, compare against the latest release tag
+            $latestTag = (git describe --tags --abbrev=0 2>$null)
+            if ($latestTag) {
+              Write-Host "Latest release tag found: $latestTag"
+              $diffTarget = $latestTag
+            } else {
+              $hasParent = (git rev-parse --verify HEAD~1 2>$null)
+              if (-not $hasParent) {
+                Write-Host "Initial repository commit and no tags found. Proceeding with build."
+                "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+                exit 0
+              }
+              $diffTarget = 'HEAD~1'
+            }
+          }
+
+          Write-Host "Comparing changes against base target: $diffTarget"
+          $changedFiles = git diff --name-only $diffTarget HEAD
+          Write-Host "Total changed files: $($changedFiles.Count)"
+
+          # Whitelist actual code and installer assets only
+          $codeChanges = $changedFiles | Where-Object {
+            $_ -match '^src/' -or
+            $_ -match '^tests/' -or
+            $_ -match '\.sln$' -or
+            $_ -match '^installer\.iss$'
+          }
+
+          if ($codeChanges) {
+            Write-Host "Code changes detected ($($codeChanges.Count) file(s)):"
+            $codeChanges | ForEach-Object { Write-Host " - $_" }
+            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            Write-Host "No code changes detected against $diffTarget. Skipping build and release."
+            "should_build=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
       - name: Calculate Release Version & Tag
         id: versioning
+        if: steps.check.outputs.should_build == 'true'
         shell: pwsh
         run: |
           $commitCount = (git rev-list --count HEAD).Trim()
@@ -49,53 +111,6 @@ jobs:
           Write-Host "Calculated Tag: $tag"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-
-      - name: Check for Code Changes
-        id: check
-        shell: pwsh
-        run: |
-          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-            Write-Host "Manual workflow dispatch trigger. Proceeding with full build."
-            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            exit 0
-          }
-
-          $hasParent = (git rev-parse --verify HEAD~1 2>$null)
-          if (-not $hasParent) {
-            Write-Host "Initial repository commit. Proceeding with build."
-            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            exit 0
-          }
-
-          $beforeSha = '${{ github.event.before }}'
-          if ($beforeSha -and $beforeSha -notmatch '^0+$' -and (git cat-file -e $beforeSha 2>$null)) {
-            $diffTarget = $beforeSha
-          } elseif ('${{ github.event_name }}' -eq 'pull_request') {
-            $diffTarget = 'origin/${{ github.base_ref }}'
-          } else {
-            $diffTarget = 'HEAD~1'
-          }
-
-          Write-Host "Comparing changes against base commit: $diffTarget"
-          $changedFiles = git diff --name-only $diffTarget HEAD
-          Write-Host "Changed file count: $($changedFiles.Count)"
-          $changedFiles | ForEach-Object { Write-Host " - $_" }
-
-          $codeChanges = $changedFiles | Where-Object {
-            $_ -notmatch '\.md$' -and
-            $_ -notmatch '^docs/' -and
-            $_ -notmatch '^\.github/CODEOWNERS$' -and
-            $_ -notmatch '^\.gitignore$' -and
-            $_ -notmatch '^LICENSE$'
-          }
-
-          if ($codeChanges) {
-            Write-Host "Code changes detected ($($codeChanges.Count) file(s)). Proceeding with build."
-            "should_build=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          } else {
-            Write-Host "Only documentation, markdown, or metadata files changed. Skipping build and release."
-            "should_build=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          }
 
   # JOB 2: RUN UNIT TESTS
   test:
@@ -329,4 +344,3 @@ jobs:
           } catch {
             Write-Warning "Failed to dispatch email notification via StarSystems Comms API: $_"
           }
-

@@ -172,6 +172,16 @@ Thank you for supporting free and open-source software!
 
 ---
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=kevink56%2Fmetadataeditor&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kevink56/metadataeditor&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kevink56/metadataeditor&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kevink56/metadataeditor&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## 📄 License
 
 This software is licensed under the **GNU General Public License v3.0 (GPL-3.0)** — see the [LICENSE](LICENSE) file for details.
